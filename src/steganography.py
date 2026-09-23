@@ -246,3 +246,185 @@ def prepare_payload(payload: bytes) -> bytes:
     header = create_header(len(payload))
 
     return header + payload
+
+# ============================================================
+# LSB Embedding
+# ============================================================
+
+def embed_payload(
+    image: Image.Image,
+    payload: bytes,
+    positions: Sequence[int],
+) -> Image.Image:
+    """
+    Embed a payload into the image using the Least Significant Bit
+    of RGB channels.
+
+    Parameters
+    ----------
+    image:
+        Cover image in RGB or RGBA format.
+
+    payload:
+        Payload bytes. The payload will automatically receive
+        the steganography header.
+
+    positions:
+        Flattened channel indices where bits will be embedded.
+
+    Returns
+    -------
+    Image.Image
+        New image containing the embedded payload.
+
+    Notes
+    -----
+    RGB channels are used.
+    Alpha channel is never modified.
+    """
+
+    image = normalize_image(image)
+    validate_image(image)
+
+    prepared_payload = prepare_payload(payload)
+    payload_bits = bytes_to_bits(prepared_payload)
+
+    if len(payload_bits) > len(positions):
+        raise CapacityError(
+            "Payload exceeds the provided embedding capacity."
+        )
+
+    array = np.array(image)
+
+    if image.mode == "RGB":
+        pixel_array = array.reshape(-1, 3)
+
+    elif image.mode == "RGBA":
+        pixel_array = array[:, :, :3].reshape(-1, 3)
+
+    else:
+        raise InvalidImageError(
+            f"Unsupported image mode: {image.mode}"
+        )
+
+    flat_rgb = pixel_array.reshape(-1)
+
+    for bit, position in zip(payload_bits, positions):
+        if position < 0 or position >= len(flat_rgb):
+            raise InvalidPayloadError(
+                f"Invalid embedding position: {position}"
+            )
+
+        flat_rgb[position] = (
+            flat_rgb[position] & 0b11111110
+        ) | bit
+
+    if image.mode == "RGB":
+        result_array = flat_rgb.reshape(array.shape)
+
+        return Image.fromarray(
+            result_array.astype(np.uint8),
+            mode="RGB",
+        )
+
+    # RGBA
+    result_array = array.copy()
+
+    rgb_result = flat_rgb.reshape(
+        array.shape[0],
+        array.shape[1],
+        3,
+    )
+
+    result_array[:, :, :3] = rgb_result
+
+    return Image.fromarray(
+        result_array.astype(np.uint8),
+        mode="RGBA",
+    )
+
+# ============================================================
+# LSB Extraction
+# ============================================================
+
+def extract_payload(
+    image: Image.Image,
+    positions: Sequence[int],
+) -> bytes:
+    """
+    Extract a payload from an image using the Least Significant Bit
+    of RGB channels.
+
+    The function first extracts the fixed-size header, reads the
+    payload length, and then extracts exactly the required number
+    of payload bytes.
+    """
+
+    image = normalize_image(image)
+    validate_image(image)
+
+    array = np.array(image)
+
+    if image.mode == "RGB":
+        pixel_array = array.reshape(-1, 3)
+
+    elif image.mode == "RGBA":
+        pixel_array = array[:, :, :3].reshape(-1, 3)
+
+    else:
+        raise InvalidImageError(
+            f"Unsupported image mode: {image.mode}"
+        )
+
+    flat_rgb = pixel_array.reshape(-1)
+
+    required_header_bits = HEADER_SIZE * 8
+
+    if len(positions) < required_header_bits:
+        raise CapacityError(
+            "Not enough positions to extract the header."
+        )
+
+    header_bits = []
+
+    for position in positions[:required_header_bits]:
+        if position < 0 or position >= len(flat_rgb):
+            raise InvalidPayloadError(
+                f"Invalid extraction position: {position}"
+            )
+
+        header_bits.append(
+            int(flat_rgb[position]) & 1
+        )
+
+    header = bits_to_bytes(header_bits)
+
+    payload_length = parse_header(header)
+
+    required_payload_bits = payload_length * 8
+
+    total_required_bits = (
+        required_header_bits
+        + required_payload_bits
+    )
+
+    if len(positions) < total_required_bits:
+        raise CapacityError(
+            "Image does not contain enough data for the declared payload."
+        )
+
+    payload_bits = []
+
+    for position in positions[
+        required_header_bits:total_required_bits
+    ]:
+        if position < 0 or position >= len(flat_rgb):
+            raise InvalidPayloadError(
+                f"Invalid extraction position: {position}"
+            )
+
+        payload_bits.append(
+            int(flat_rgb[position]) & 1
+        )
+
+    return bits_to_bytes(payload_bits)

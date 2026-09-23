@@ -1,4 +1,5 @@
 from PIL import Image
+import numpy as np
 import pytest
 
 from src.steganography import (
@@ -10,6 +11,8 @@ from src.steganography import (
     bits_to_bytes,
     calculate_capacity,
     create_header,
+    embed_payload,
+    extract_payload,
     parse_header,
     prepare_payload,
 )
@@ -87,3 +90,83 @@ def test_rgba_capacity():
     expected = (100 * 100 * 3) // 8 - HEADER_SIZE
 
     assert capacity == expected
+
+def test_embed_and_extract_rgb():
+    image = Image.new("RGB", (100, 100), color=(120, 150, 200))
+
+    payload = b"Hello Steganography!"
+
+    capacity = calculate_capacity(image)
+
+    positions = list(range(
+        (capacity + HEADER_SIZE) * 8
+    ))
+
+    stego = embed_payload(
+        image,
+        payload,
+        positions,
+    )
+
+    extracted = extract_payload(
+        stego,
+        positions,
+    )
+
+    assert extracted == payload
+
+def test_embed_and_extract_rgba():
+    image = Image.new(
+        "RGBA",
+        (100, 100),
+        color=(120, 150, 200, 255),
+    )
+
+    payload = b"Hello RGBA!"
+
+    capacity = calculate_capacity(image)
+
+    positions = list(range(
+        (capacity + HEADER_SIZE) * 8
+    ))
+
+    stego = embed_payload(
+        image,
+        payload,
+        positions,
+    )
+
+    extracted = extract_payload(
+        stego,
+        positions,
+    )
+
+    assert extracted == payload
+
+def test_embedding_does_not_modify_original():
+    image = Image.new(
+        "RGB",
+        (100, 100),
+        color=(120, 150, 200),
+    )
+
+    original = np.array(image).copy()
+
+    payload = b"Original image test"
+
+    capacity = calculate_capacity(image)
+
+    positions = list(range(
+        (capacity + HEADER_SIZE) * 8
+    ))
+
+    embed_payload(
+        image,
+        payload,
+        positions,
+    )
+
+    assert np.array_equal(
+        np.array(image),
+        original,
+    )
