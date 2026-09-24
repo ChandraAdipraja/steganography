@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Encode & Decode — StegoCrypt{% endblock %}
+{% block content %}
+
+<section class="max-w-[1120px] mx-auto px-5 lg:px-6 pt-8 pb-6">
+    <div class="max-w-[640px]">
+        <div class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-400">StegoCrypt Tool</div>
+        <h1 class="mt-2 text-[32px] font-extrabold tracking-tight leading-none">Encode & Decode</h1>
+        <p class="mt-2 text-sm leading-6 text-zinc-500">Sembunyikan pesan ke dalam gambar atau ekstrak kembali pesan yang telah disisipkan — satu alur, dua mode.</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="mt-8 border-b border-zinc-200">
+        <div class="flex gap-6">
+            <button id="tab-encode" class="pb-3 border-b-2 border-zinc-900 text-sm font-semibold">Encode</button>
+            <button id="tab-decode" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700">Decode</button>
+        </div>
+    </div>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mt-6 space-y-2">
+          {% for cat, msg in messages %}
+            <div class="px-4 py-3 rounded-xl text-sm {% if cat=='success' %}bg-green-50 border border-green-200 text-green-800{% elif cat=='error' %}bg-red-50 border border-red-200 text-red-800{% else %}bg-zinc-50 border border-zinc-200 text-zinc-700{% endif %}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Encode panel -->
+    <div id="panel-encode" class="mt-6 space-y-5">
+        <form method="POST" action="{{ url_for('encode_post') }}" enctype="multipart/form-data" class="space-y-5">
+            <!-- 01 Cover -->
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="font-semibold text-sm">01 — Cover Image</div>
+                <p class="text-xs text-zinc-500 mt-1">Format yang didukung: PNG dan BMP. Gambar tidak diubah kecuali pada bit LSB.</p>
+                <label class="mt-4 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50">
+                    <span class="text-sm font-medium">Upload cover image</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, drag & drop atau klik</span>
+                    <input type="file" name="cover" accept=".png,.bmp" class="hidden" onchange="previewImage(this,'cover-preview','cover-meta')">
+                </label>
+                <div id="cover-meta" class="hidden mt-4 grid grid-cols-3 gap-3 text-center">
+                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Width</div><div id="cover-w" class="text-sm font-semibold">-</div></div>
+                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Height</div><div id="cover-h" class="text-sm font-semibold">-</div></div>
+                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Capacity</div><div id="cover-c" class="text-sm font-semibold">-</div></div>
+                </div>
+                <img id="cover-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200">
+            </div>
+
+            <!-- 02 Security -->
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="font-semibold text-sm">02 — Keamanan</div>
+                <input type="password" name="password" placeholder="Masukkan password..." class="mt-3 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300">
+                <p class="mt-2 text-xs text-zinc-500">Password digunakan untuk enkripsi dan pembuatan stego-key pada versi final.</p>
+            </div>
+
+            <!-- 03 Message -->
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="font-semibold text-sm">03 — Secret Message</div>
+                <textarea name="message" rows="5" placeholder="Tulis pesan rahasia yang ingin disembunyikan..." class="mt-3 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"></textarea>
+                <p class="mt-2 text-xs text-zinc-500">Pesan akan dienkripsi sebelum disisipkan.</p>
+            </div>
+
+            <button type="submit" class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition">Encode Message →</button>
+        </form>
+
+        {% if stego_url %}
+        <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+            <div class="font-semibold text-sm">04 — Result</div>
+            <p class="text-xs text-zinc-500">Bandingkan cover dan stego. Perbedaan visual dirancang minimal.</p>
+            <div class="mt-4 grid sm:grid-cols-2 gap-4">
+                <img src="{{ cover_url }}" class="w-full rounded-xl border border-zinc-200" alt="Cover">
+                <img src="{{ stego_url }}" class="w-full rounded-xl border border-zinc-200" alt="Stego">
+            </div>
+            <a href="{{ stego_url }}" download="stego.png" class="mt-4 inline-flex w-full justify-center rounded-full bg-zinc-900 text-white py-3 text-sm font-semibold">⬇ Download Stego Image</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Decode panel -->
+    <div id="panel-decode" class="hidden mt-6 space-y-5">
+        <form method="POST" action="{{ url_for('decode_post') }}" enctype="multipart/form-data" class="space-y-5">
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="font-semibold text-sm">01 — Stego Image</div>
+                <p class="text-xs text-zinc-500 mt-1">Upload PNG atau BMP yang berisi pesan tersembunyi.</p>
+                <label class="mt-4 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50">
+                    <span class="text-sm font-medium">Upload stego image</span>
+                    <input type="file" name="stego" accept=".png,.bmp" class="hidden" onchange="previewImage(this,'stego-preview','stego-meta')">
+                </label>
+                <div id="stego-meta" class="hidden mt-4 grid grid-cols-2 gap-3 text-center">
+                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase text-zinc-400">Width</div><div id="stego-w" class="text-sm font-semibold">-</div></div>
+                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase text-zinc-400">Height</div><div id="stego-h" class="text-sm font-semibold">-</div></div>
+                </div>
+                <img id="stego-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200">
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="font-semibold text-sm">02 — Stego-Key / Password</div>
+                <input type="password" name="password" placeholder="Masukkan password pengirim..." class="mt-3 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
+                <p class="mt-2 text-xs text-zinc-500">Harus sama dengan password yang digunakan saat encoding.</p>
+            </div>
+
+            <button type="submit" class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition">Decode Message →</button>
+        </form>
+
+        {% if decoded_message is defined and decoded_message is not none %}
+        <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+            <div class="font-semibold text-sm">03 — Extracted Message</div>
+            <textarea readonly rows="5" class="mt-3 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">{{ decoded_message }}</textarea>
+            <div class="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">Pesan tersembunyi berhasil diekstrak.</div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const tabEncode = document.getElementById('tab-encode');
+const tabDecode = document.getElementById('tab-decode');
+const panelEncode = document.getElementById('panel-encode');
+const panelDecode = document.getElementById('panel-decode');
+function showEncode(){ tabEncode.className='pb-3 border-b-2 border-zinc-900 text-sm font-semibold'; tabDecode.className='pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500'; panelEncode.classList.remove('hidden'); panelDecode.classList.add('hidden'); }
+function showDecode(){ tabDecode.className='pb-3 border-b-2 border-zinc-900 text-sm font-semibold'; tabEncode.className='pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500'; panelDecode.classList.remove('hidden'); panelEncode.classList.add('hidden'); }
+tabEncode?.addEventListener('click', showEncode);
+tabDecode?.addEventListener('click', showDecode);
+if (location.hash === '#decode') showDecode();
+
+function previewImage(input, imgId, metaId){
+    const file = input.files[0];
+    if(!file) return;
+    const img = document.getElementById(imgId);
+    const meta = document.getElementById(metaId);
+    img.src = URL.createObjectURL(file);
+    img.classList.remove('hidden');
+    const tmp = new Image();
+    tmp.onload = ()=>{
+        const w = tmp.width, h = tmp.height;
+        const cap = Math.floor(w*h*3/8) - 8;
+        if (metaId==='cover-meta'){
+            document.getElementById('cover-w').textContent = w+'px';
+            document.getElementById('cover-h').textContent = h+'px';
+            document.getElementById('cover-c').textContent = (cap>0?cap:0).toLocaleString()+' bytes';
+        } else {
+            document.getElementById('stego-w').textContent = w+'px';
+            document.getElementById('stego-h').textContent = h+'px';
+        }
+        meta.classList.remove('hidden');
+    };
+    tmp.src = img.src;
+}
+</script>
+{% endblock %}
