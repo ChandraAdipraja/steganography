@@ -1,4 +1,5 @@
 import os
+import hashlib
 import io
 import uuid
 from pathlib import Path
@@ -6,13 +7,15 @@ from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, flash
 from PIL import Image
 
+from src.analysis import calculate_mse, calculate_psnr
+from src.prng import generate_positions
 from src.steganography import (
     calculate_capacity,
     embed_payload,
     extract_payload,
-    HEADER_SIZE,
     CapacityError,
     InvalidImageError,
+    InvalidPayloadError,
 )
 from src.crypto import decrypt_message, encrypt_message
 
@@ -21,6 +24,14 @@ app.secret_key = os.environ.get("SECRET_KEY", "stegocrypt-dev")
 
 UPLOAD_DIR = Path("static/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def draft_derive_prng_seed(password: str) -> bytes:
+    if not isinstance(password, str):
+        raise TypeError("password must be a str")
+    if not password.strip():
+        raise ValueError("password must be a non-empty string")
+    return hashlib.sha256((password + "|PRNG").encode("utf-8")).digest()
 
 
 @app.route("/")
@@ -67,27 +78,36 @@ def encode_post():
             flash("Pesan terlalu besar untuk gambar ini.", "error")
             return redirect(url_for("encode_page"))
 
-        positions = list(range((capacity + HEADER_SIZE) * 8))
+        width, height = image.size
+        total_slots = width * height * 3
+        seed = draft_derive_prng_seed(password)
+        positions = generate_positions(total_slots, total_slots, seed)
         stego = embed_payload(image, payload, positions)
 
         cover_id = uuid.uuid4().hex[:8]
         cover_path = UPLOAD_DIR / f"{cover_id}_cover.png"
         stego_path = UPLOAD_DIR / f"{cover_id}_stego.png"
 
-        # save original (normalized) for preview
         image.save(cover_path, format="PNG")
         stego.save(stego_path, format="PNG")
 
+        mse_value = calculate_mse(image, stego)
+        psnr_value = calculate_psnr(image, stego)
+
         cover_url = url_for("static", filename=f"uploads/{cover_path.name}")
         stego_url = url_for("static", filename=f"uploads/{stego_path.name}")
+        if psnr_value == float("inf"):
+            psnr_display = "∞ (gambar identik)"
+        else:
+            psnr_display = f"{psnr_value:.2f} dB"
 
         flash("Pesan berhasil disisipkan!", "success")
         return render_template(
             "encode.html",
             cover_url=cover_url,
             stego_url=stego_url,
-            # DEBUG: hex blob (salt+nonce+tag+ciphertext) yang disisipkan.
-            # Hapus sebelum final agar respons HTML tetap bersih.
+            mse_display=f"{mse_value:.6f}",
+            psnr_display=psnr_display,
             payload_len=len(payload),
             payload_hex_preview=payload.hex()[:512],
         )
@@ -121,8 +141,10 @@ def decode_post():
         if image.mode not in {"RGB", "RGBA"}:
             image = image.convert("RGB")
 
-        capacity = calculate_capacity(image)
-        positions = list(range((capacity + HEADER_SIZE) * 8))
+        width, height = image.size
+        total_slots = width * height * 3
+        seed = draft_derive_prng_seed(password)
+        positions = generate_positions(total_slots, total_slots, seed)
         payload = extract_payload(image, positions)
         plaintext = decrypt_message(payload, password)
         decoded = plaintext.decode("utf-8")
@@ -130,6 +152,9 @@ def decode_post():
         flash("Pesan berhasil diekstrak!", "success")
         return render_template("encode.html", decoded_message=decoded)
 
+    except InvalidPayloadError:
+        flash("Password salah atau data telah dimodifikasi.", "error")
+        return redirect(url_for("encode_page") + "#decode")
     except ValueError:
         flash("Password salah atau data telah dimodifikasi.", "error")
         return redirect(url_for("encode_page") + "#decode")
