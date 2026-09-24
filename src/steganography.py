@@ -7,10 +7,6 @@ import numpy as np
 from PIL import Image
 
 
-# ============================================================
-# Constants
-# ============================================================
-
 SUPPORTED_FORMATS = {"PNG", "BMP"}
 
 MAGIC = b"STG1"
@@ -20,36 +16,23 @@ HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 BITS_PER_CHANNEL = 1
 
 
-# ============================================================
-# Custom Exceptions
-# ============================================================
-
 class SteganographyError(Exception):
-    """Base exception for steganography-related errors."""
+    pass
 
 
 class InvalidImageError(SteganographyError):
-    """Raised when the image format or mode is unsupported."""
+    pass
 
 
 class InvalidPayloadError(SteganographyError):
-    """Raised when the payload or header is invalid."""
+    pass
 
 
 class CapacityError(SteganographyError):
-    """Raised when the payload exceeds image capacity."""
+    pass
 
-
-# ============================================================
-# Image Utilities
-# ============================================================
 
 def validate_image(image: Image.Image) -> None:
-    """
-    Validate that the image is a supported PNG or BMP image.
-
-    The image must have RGB or RGBA mode.
-    """
     if image.format is not None:
         image_format = image.format.upper()
 
@@ -67,13 +50,6 @@ def validate_image(image: Image.Image) -> None:
 
 
 def normalize_image(image: Image.Image) -> Image.Image:
-    """
-    Normalize an image into RGB or RGBA.
-
-    RGB remains RGB.
-    RGBA remains RGBA.
-    Other modes are converted to RGB.
-    """
     if image.mode in {"RGB", "RGBA"}:
         return image.copy()
 
@@ -81,14 +57,6 @@ def normalize_image(image: Image.Image) -> Image.Image:
 
 
 def get_used_channels(image: Image.Image) -> int:
-    """
-    Return the number of channels used for LSB embedding.
-
-    RGB  -> 3
-    RGBA -> 3
-
-    The alpha channel is intentionally not modified.
-    """
     if image.mode == "RGB":
         return 3
 
@@ -100,19 +68,7 @@ def get_used_channels(image: Image.Image) -> int:
     )
 
 
-# ============================================================
-# Capacity
-# ============================================================
-
 def calculate_capacity(image: Image.Image) -> int:
-    """
-    Calculate the maximum payload capacity in bytes.
-
-    One LSB is used from each RGB channel.
-
-    The returned capacity represents the maximum size of the
-    payload itself, excluding the header.
-    """
     image = normalize_image(image)
     channels = get_used_channels(image)
 
@@ -130,17 +86,7 @@ def calculate_capacity(image: Image.Image) -> int:
     return max(0, capacity_bytes - HEADER_SIZE)
 
 
-# ============================================================
-# Byte / Bit Conversion
-# ============================================================
-
 def bytes_to_bits(data: bytes) -> list[int]:
-    """
-    Convert bytes into a list of bits.
-
-    Example:
-        b"A" -> [0, 1, 0, 0, 0, 0, 0, 1]
-    """
     bits: list[int] = []
 
     for byte in data:
@@ -151,11 +97,6 @@ def bytes_to_bits(data: bytes) -> list[int]:
 
 
 def bits_to_bytes(bits: Sequence[int]) -> bytes:
-    """
-    Convert a sequence of bits into bytes.
-
-    The number of bits must be a multiple of 8.
-    """
     if len(bits) % 8 != 0:
         raise InvalidPayloadError(
             "Bit sequence length must be a multiple of 8."
@@ -179,18 +120,7 @@ def bits_to_bytes(bits: Sequence[int]) -> bytes:
     return bytes(result)
 
 
-# ============================================================
-# Header
-# ============================================================
-
 def create_header(payload_length: int) -> bytes:
-    """
-    Create the payload header.
-
-    Format:
-        MAGIC (4 bytes)
-        LENGTH (4 bytes, unsigned integer)
-    """
     if payload_length < 0:
         raise InvalidPayloadError(
             "Payload length cannot be negative."
@@ -209,9 +139,6 @@ def create_header(payload_length: int) -> bytes:
 
 
 def parse_header(header: bytes) -> int:
-    """
-    Parse a header and return the payload length.
-    """
     if len(header) != HEADER_SIZE:
         raise InvalidPayloadError(
             f"Header must be exactly {HEADER_SIZE} bytes."
@@ -230,14 +157,7 @@ def parse_header(header: bytes) -> int:
     return payload_length
 
 
-# ============================================================
-# Payload Preparation
-# ============================================================
-
 def prepare_payload(payload: bytes) -> bytes:
-    """
-    Add the steganography header to the payload.
-    """
     if not isinstance(payload, bytes):
         raise InvalidPayloadError(
             "Payload must be bytes."
@@ -247,42 +167,12 @@ def prepare_payload(payload: bytes) -> bytes:
 
     return header + payload
 
-# ============================================================
-# LSB Embedding
-# ============================================================
 
 def embed_payload(
     image: Image.Image,
     payload: bytes,
     positions: Sequence[int],
 ) -> Image.Image:
-    """
-    Embed a payload into the image using the Least Significant Bit
-    of RGB channels.
-
-    Parameters
-    ----------
-    image:
-        Cover image in RGB or RGBA format.
-
-    payload:
-        Payload bytes. The payload will automatically receive
-        the steganography header.
-
-    positions:
-        Flattened channel indices where bits will be embedded.
-
-    Returns
-    -------
-    Image.Image
-        New image containing the embedded payload.
-
-    Notes
-    -----
-    RGB channels are used.
-    Alpha channel is never modified.
-    """
-
     image = normalize_image(image)
     validate_image(image)
 
@@ -327,7 +217,6 @@ def embed_payload(
             mode="RGB",
         )
 
-    # RGBA
     result_array = array.copy()
 
     rgb_result = flat_rgb.reshape(
@@ -343,23 +232,11 @@ def embed_payload(
         mode="RGBA",
     )
 
-# ============================================================
-# LSB Extraction
-# ============================================================
 
 def extract_payload(
     image: Image.Image,
     positions: Sequence[int],
 ) -> bytes:
-    """
-    Extract a payload from an image using the Least Significant Bit
-    of RGB channels.
-
-    The function first extracts the fixed-size header, reads the
-    payload length, and then extracts exactly the required number
-    of payload bytes.
-    """
-
     image = normalize_image(image)
     validate_image(image)
 
