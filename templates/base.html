@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}StegoCrypt — Secure Image Steganography{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style> *{font-family:'Inter',system-ui,-apple-system,sans-serif} </style>
+</head>
+<body class="bg-[#FCFCF9] text-zinc-800 antialiased selection:bg-zinc-900 selection:text-white">
+
+    <!-- Navbar -->
+    <header class="sticky top-0 z-40 bg-[#FCFCF9]/80 backdrop-blur-md border-b border-zinc-200/60">
+        <nav class="max-w-[1120px] mx-auto px-5 lg:px-6 h-[64px] flex items-center justify-between gap-6">
+            <!-- Brand -->
+            <a href="/" class="flex items-center gap-3 shrink-0">
+                <div class="leading-none">
+                    <div class="font-bold tracking-tight text-[15px]">StegoCrypt</div>
+                    <div class="text-[11px] tracking-wide text-zinc-500 font-medium">Secure image steganography</div>
+                </div>
+            </a>
+
+            <!-- Desktop nav — no card, underlined active -->
+            <div class="hidden md:flex items-center gap-6">
+                <a href="/" class="py-2 text-sm font-medium border-b-2 transition {% if request.path == '/' %}border-zinc-900 text-zinc-900{% else %}border-transparent text-zinc-500 hover:text-zinc-900{% endif %}">Beranda</a>
+                <a href="/#tentang" class="py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300 transition">Tentang</a>
+                <a href="/encode" class="py-2 text-sm font-medium border-b-2 transition {% if request.path.startswith('/encode') %}border-zinc-900 text-zinc-900{% else %}border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300{% endif %}">Encode / Decode</a>
+            </div>
+
+            <!-- Mobile hamburger -->
+            <button id="hamburger" class="md:hidden w-9 h-9 rounded-xl border border-zinc-200 bg-white flex items-center justify-center text-lg leading-none">☰</button>
+        </nav>
+
+        <!-- Mobile menu — also no black card -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-zinc-200/60 bg-white">
+            <div class="max-w-[1120px] mx-auto px-5 py-4 flex flex-col gap-2">
+                <a href="/" class="px-4 py-3 rounded-xl text-sm font-medium border {% if request.path == '/' %}border-zinc-900 text-zinc-900 bg-zinc-50{% else %}border-zinc-200 text-zinc-600 hover:bg-zinc-50{% endif %}">Beranda</a>
+                <a href="/#tentang" class="px-4 py-3 rounded-xl text-sm font-medium border border-zinc-200 text-zinc-600 hover:bg-zinc-50">Tentang</a>
+                <a href="/encode" class="px-4 py-3 rounded-xl text-sm font-medium border text-center {% if request.path.startswith('/encode') %}border-zinc-900 text-zinc-900 bg-zinc-50{% else %}border-zinc-200 text-zinc-600 hover:bg-zinc-50{% endif %}">Encode / Decode</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-16 border-t border-zinc-200/60">
+        <div class="max-w-[1120px] mx-auto px-5 lg:px-6 py-10">
+            <div class="flex flex-col md:flex-row justify-between gap-6">
+                <div class="max-w-[420px]">
+                    <div class="flex items-center gap-2 font-bold tracking-tight">
+                        StegoCrypt
+                    </div>
+                    <p class="mt-2 text-sm leading-6 text-zinc-500">Aplikasi steganografi untuk menyembunyikan pesan rahasia di dalam gambar — LSB · AES · PRNG.</p>
+                </div>
+                <div class="flex items-center gap-2 text-xs font-medium text-zinc-500">
+                    <span>Steganography</span><span class="opacity-30">•</span><span>Informatika</span><span class="opacity-30">•</span><span>2026</span>
+                </div>
+            </div>
+            <div class="mt-8 pt-6 border-t border-zinc-200/40 flex flex-col md:flex-row justify-between gap-2 text-xs text-zinc-400">
+                <span>© 2026 StegoCrypt. All rights reserved.</span>
+                <span>Built with Flask & Tailwind CSS</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const btn = document.getElementById('hamburger');
+        const menu = document.getElementById('mobile-menu');
+        if (btn && menu) {
+            btn.addEventListener('click', () => {
+                const open = !menu.classList.contains('hidden');
+                menu.classList.toggle('hidden', open);
+                btn.textContent = open ? '☰' : '✕';
+            });
+            menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+                menu.classList.add('hidden');
+                btn.textContent = '☰';
+            }));
+        }
+        // smooth scroll for #tentang
+        document.querySelectorAll('a[href="/#tentang"]').forEach(a=>{
+            a.addEventListener('click', e=>{
+                if (location.pathname === '/') {
+                    e.preventDefault();
+                    document.getElementById('tentang')?.scrollIntoView({behavior:'smooth', block:'start'});
+                    history.replaceState(null,'', '/');
+                }
+            });
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
