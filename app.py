@@ -14,6 +14,7 @@ from src.steganography import (
     CapacityError,
     InvalidImageError,
 )
+from src.crypto import decrypt_message, encrypt_message
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "stegocrypt-dev")
@@ -56,7 +57,11 @@ def encode_post():
             image = image.convert("RGB")
 
         capacity = calculate_capacity(image)
-        payload = message.encode("utf-8")
+        try:
+            payload = encrypt_message(message.encode("utf-8"), password)
+        except ValueError:
+            flash("Password tidak boleh kosong.", "error")
+            return redirect(url_for("encode_page"))
 
         if len(payload) > capacity:
             flash("Pesan terlalu besar untuk gambar ini.", "error")
@@ -77,7 +82,15 @@ def encode_post():
         stego_url = url_for("static", filename=f"uploads/{stego_path.name}")
 
         flash("Pesan berhasil disisipkan!", "success")
-        return render_template("encode.html", cover_url=cover_url, stego_url=stego_url)
+        return render_template(
+            "encode.html",
+            cover_url=cover_url,
+            stego_url=stego_url,
+            # DEBUG: hex blob (salt+nonce+tag+ciphertext) yang disisipkan.
+            # Hapus sebelum final agar respons HTML tetap bersih.
+            payload_len=len(payload),
+            payload_hex_preview=payload.hex()[:512],
+        )
 
     except CapacityError:
         flash("Pesan terlalu besar untuk gambar.", "error")
@@ -111,11 +124,15 @@ def decode_post():
         capacity = calculate_capacity(image)
         positions = list(range((capacity + HEADER_SIZE) * 8))
         payload = extract_payload(image, positions)
-        decoded = payload.decode("utf-8")
+        plaintext = decrypt_message(payload, password)
+        decoded = plaintext.decode("utf-8")
 
         flash("Pesan berhasil diekstrak!", "success")
         return render_template("encode.html", decoded_message=decoded)
 
+    except ValueError:
+        flash("Password salah atau data telah dimodifikasi.", "error")
+        return redirect(url_for("encode_page") + "#decode")
     except UnicodeDecodeError:
         flash("Payload tidak dapat dibaca. Password mungkin salah.", "error")
         return redirect(url_for("encode_page") + "#decode")
