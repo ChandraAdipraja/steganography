@@ -11,10 +11,8 @@
 </head>
 <body class="bg-[#FCFCF9] text-zinc-800 antialiased selection:bg-zinc-900 selection:text-white">
 
-    <!-- Navbar -->
     <header class="sticky top-0 z-40 bg-[#FCFCF9]/80 backdrop-blur-md border-b border-zinc-200/60">
         <nav class="max-w-[1120px] mx-auto px-5 lg:px-6 h-[64px] flex items-center justify-between gap-6">
-            <!-- Brand -->
             <a href="/" class="flex items-center gap-3 shrink-0">
                 <div class="leading-none">
                     <div class="font-bold tracking-tight text-[15px]">StegoCrypt</div>
@@ -22,18 +20,15 @@
                 </div>
             </a>
 
-            <!-- Desktop nav — no card, underlined active -->
             <div class="hidden md:flex items-center gap-6">
                 <a href="/" class="py-2 text-sm font-medium border-b-2 transition {% if request.path == '/' %}border-zinc-900 text-zinc-900{% else %}border-transparent text-zinc-500 hover:text-zinc-900{% endif %}">Beranda</a>
                 <a href="/#tentang" class="py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300 transition">Tentang</a>
                 <a href="/encode" class="py-2 text-sm font-medium border-b-2 transition {% if request.path.startswith('/encode') %}border-zinc-900 text-zinc-900{% else %}border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300{% endif %}">Encode / Decode</a>
             </div>
 
-            <!-- Mobile hamburger -->
             <button id="hamburger" class="md:hidden w-9 h-9 rounded-xl border border-zinc-200 bg-white flex items-center justify-center text-lg leading-none">☰</button>
         </nav>
 
-        <!-- Mobile menu — also no black card -->
         <div id="mobile-menu" class="hidden md:hidden border-t border-zinc-200/60 bg-white">
             <div class="max-w-[1120px] mx-auto px-5 py-4 flex flex-col gap-2">
                 <a href="/" class="px-4 py-3 rounded-xl text-sm font-medium border {% if request.path == '/' %}border-zinc-900 text-zinc-900 bg-zinc-50{% else %}border-zinc-200 text-zinc-600 hover:bg-zinc-50{% endif %}">Beranda</a>
@@ -47,7 +42,6 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer -->
     <footer class="mt-16 border-t border-zinc-200/60">
         <div class="max-w-[1120px] mx-auto px-5 lg:px-6 py-10">
             <div class="flex flex-col md:flex-row justify-between gap-6">
@@ -82,7 +76,6 @@
                 btn.textContent = '☰';
             }));
         }
-        // smooth scroll for #tentang
         document.querySelectorAll('a[href="/#tentang"]').forEach(a=>{
             a.addEventListener('click', e=>{
                 if (location.pathname === '/') {
