@@ -39,8 +39,9 @@
                 <div id="cover-meta" class="hidden mt-4 grid grid-cols-3 gap-3 text-center">
                     <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Width</div><div id="cover-w" class="text-sm font-semibold">-</div></div>
                     <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Height</div><div id="cover-h" class="text-sm font-semibold">-</div></div>
-                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Capacity</div><div id="cover-c" class="text-sm font-semibold">-</div></div>
+                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Max Plaintext</div><div id="cover-c" class="text-sm font-semibold">-</div></div>
                 </div>
+                <p id="cover-cap-note" class="hidden mt-2 text-[11px] text-zinc-500 text-center">Kapasitas = w×h×3/8 − 52 (8 header STG1 + 44 crypto). Angka di atas adalah budget plaintext.</p>
                 <img id="cover-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200">
             </div>
 
@@ -135,7 +136,7 @@ function previewImage(input, imgId, metaId){
     const tmp = new Image();
     tmp.onload = ()=>{
         const w = tmp.width, h = tmp.height;
-        const cap = Math.floor(w*h*3/8) - 8;
+        const cap = Math.max(0, Math.floor(w*h*3/8) - 52); // Opsi A: plaintext budget (8 + 44)
         if (metaId==='cover-meta'){
             document.getElementById('cover-w').textContent = w+'px';
             document.getElementById('cover-h').textContent = h+'px';
@@ -145,6 +146,7 @@ function previewImage(input, imgId, metaId){
             document.getElementById('stego-h').textContent = h+'px';
         }
         meta.classList.remove('hidden');
+        if (metaId==='cover-meta') document.getElementById('cover-cap-note')?.classList.remove('hidden');
     };
     tmp.src = img.src;
 }
