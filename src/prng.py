@@ -30,7 +30,14 @@ def generate_positions(
         return []
 
     rng = random.Random(seed)
-    return list(rng.sample(range(total_slots), num_positions))
+    swapped: dict[int, int] = {}
+    result: list[int] = []
+    for i in range(num_positions):
+        j = rng.randrange(i, total_slots)
+        vi, vj = swapped.get(i, i), swapped.get(j, j)
+        result.append(vj)
+        swapped[j] = vi
+    return result
 
 
 def derive_prng_seed(stego_key: str) -> bytes:
