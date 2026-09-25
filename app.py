@@ -92,9 +92,9 @@ def encode_post():
             return redirect(url_for("encode_page"))
 
         seed = draft_derive_prng_seed(password)
-        # permutasi penuh sekali, lalu slice — supaya header & payload konsisten
-        full_perm = generate_positions(total_slots, total_slots, seed)
-        positions = full_perm[:needed]
+        # hanya generate sebanyak yang dibutuhkan — hemat untuk gambar besar + pesan kecil
+        # prefix-consistent: generate_positions(total, needed, seed)[:64] == generate_positions(total, 64, seed)
+        positions = generate_positions(total_slots, needed, seed)
         stego = embed_payload(image, payload, positions)
 
         cover_id = uuid.uuid4().hex[:8]
@@ -161,9 +161,9 @@ def decode_post():
         if total_slots < header_bits_needed:
             flash("Gambar terlalu kecil untuk berisi payload.", "error")
             return redirect(url_for("encode_page") + "#decode")
-        # satu permutasi penuh, dipakai bersama untuk header & payload — konsisten dengan encode
-        full_perm = generate_positions(total_slots, total_slots, seed)
-        header_positions = full_perm[:header_bits_needed]
+        # hemat: generate hanya 64 dulu untuk header, karena prefix-consistent
+        # generate_positions(total, 64, seed) == generate_positions(total, needed, seed)[:64]
+        header_positions = generate_positions(total_slots, header_bits_needed, seed)
         normalized = normalize_image(image)
         flat = np.array(normalized)[:, :, :3].reshape(-1)
         header_bits = [int(flat[p]) & 1 for p in header_positions]
@@ -172,7 +172,7 @@ def decode_post():
         if needed > total_slots:
             flash("Password salah atau data telah dimodifikasi.", "error")
             return redirect(url_for("encode_page") + "#decode")
-        positions = full_perm[:needed]
+        positions = generate_positions(total_slots, needed, seed)
         payload = extract_payload(image, positions)
         plaintext = decrypt_message(payload, password)
         decoded = plaintext.decode("utf-8")
