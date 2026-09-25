@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import io
 import math
 import os
 import tempfile
@@ -155,3 +157,25 @@ def test_jpeg_robustness(
 
 
 test_jpeg_robustness.__test__ = False
+
+
+def figure_to_png_bytes(fig: Figure) -> bytes:
+    buf = io.BytesIO()
+    fig.savefig(buf, format="PNG")
+    return buf.getvalue()
+
+
+def figure_to_base64(fig: Figure) -> str:
+    return base64.b64encode(figure_to_png_bytes(fig)).decode("ascii")
+
+
+def lsb_plane_to_image(plane: np.ndarray) -> Image.Image:
+    if not isinstance(plane, np.ndarray):
+        raise AnalysisError("plane must be a NumPy array")
+    if plane.dtype != np.uint8:
+        raise AnalysisError("plane must be uint8")
+    if plane.ndim != 3 or plane.shape[2] != 3:
+        raise AnalysisError("plane must have shape (H, W, 3)")
+    if not set(np.unique(plane).tolist()) <= {0, 255}:
+        raise AnalysisError("plane must contain only 0 and 255")
+    return Image.fromarray(plane, mode="RGB")

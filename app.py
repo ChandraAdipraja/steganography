@@ -121,8 +121,7 @@ def encode_post():
             stego_url=stego_url,
             mse_display=f"{mse_value:.6f}",
             psnr_display=psnr_display,
-            payload_len=len(payload),
-            payload_hex_preview=payload.hex()[:512],
+            blob_display=f"{len(payload):,} bytes",
         )
 
     except CapacityError:

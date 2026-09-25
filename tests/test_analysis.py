@@ -2,6 +2,9 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import base64
+import io
+
 import numpy as np
 import pytest
 from matplotlib import pyplot as plt
@@ -13,7 +16,10 @@ from src.analysis import (
     calculate_mse,
     calculate_psnr,
     extract_lsb_plane,
+    figure_to_base64,
+    figure_to_png_bytes,
     generate_histogram,
+    lsb_plane_to_image,
     plot_histogram,
     test_jpeg_robustness,
 )
@@ -197,3 +203,50 @@ def test_jpeg_robustness_missing_path():
     result = test_jpeg_robustness("/nonexistent/stego.png", lambda p: b"x")
     assert result["success"] is False
     assert result["error"] is not None
+
+
+def test_figure_to_png_bytes_valid_png():
+    cover = make_solid((10, 20, 30), size=(16, 16))
+    stego = make_solid((11, 20, 30), size=(16, 16))
+    fig = plot_histogram(cover, stego)
+    try:
+        data = figure_to_png_bytes(fig)
+        assert isinstance(data, bytes)
+        assert data[:8] == b"\x89PNG\r\n\x1a\n"
+        reopened = Image.open(io.BytesIO(data))
+        reopened.load()
+        assert reopened.format == "PNG"
+    finally:
+        plt.close(fig)
+
+
+def test_figure_to_base64_roundtrip():
+    cover = make_solid((10, 20, 30), size=(16, 16))
+    stego = make_solid((11, 20, 30), size=(16, 16))
+    fig = plot_histogram(cover, stego)
+    try:
+        encoded = figure_to_base64(fig)
+        assert isinstance(encoded, str)
+        assert base64.b64decode(encoded)[:8] == b"\x89PNG\r\n\x1a\n"
+    finally:
+        plt.close(fig)
+
+
+def test_lsb_plane_to_image_roundtrip():
+    plane = extract_lsb_plane(make_random_rgb(8, 8, seed=3))
+    img = lsb_plane_to_image(plane)
+    assert isinstance(img, Image.Image)
+    assert img.mode == "RGB"
+    assert img.size == (8, 8)
+    assert np.array_equal(np.array(img), plane)
+
+
+def test_lsb_plane_to_image_rejects_bad_input():
+    with pytest.raises(AnalysisError):
+        lsb_plane_to_image(np.zeros((4, 4, 3), dtype=np.int32))
+    with pytest.raises(AnalysisError):
+        lsb_plane_to_image(np.zeros((4, 4), dtype=np.uint8))
+    with pytest.raises(AnalysisError):
+        lsb_plane_to_image(np.full((4, 4, 3), 128, dtype=np.uint8))
+    with pytest.raises(AnalysisError):
+        lsb_plane_to_image([[0, 1, 2]])
