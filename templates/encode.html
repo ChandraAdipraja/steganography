@@ -74,6 +74,10 @@
                 <img src="{{ stego_url }}" class="w-full rounded-xl border border-zinc-200" alt="Stego">
             </div>
             <a href="{{ stego_url }}" download="stego.png" class="mt-4 inline-flex w-full justify-center rounded-full bg-zinc-900 text-white py-3 text-sm font-semibold">⬇ Download Stego Image</a>
+            <div class="mt-4 grid grid-cols-2 gap-3 text-center">
+                <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">MSE</div><div class="text-sm font-semibold">{{ mse_display }}</div></div>
+                <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">PSNR</div><div class="text-sm font-semibold">{{ psnr_display }}</div></div>
+            </div>
         </div>
         {% endif %}
     </div>
