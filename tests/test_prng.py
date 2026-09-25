@@ -3,15 +3,7 @@ import hashlib
 import numpy as np
 import pytest
 
-from src.prng import generate_positions
-
-
-def draft_derive_prng_seed(stego_key):
-    if not isinstance(stego_key, str):
-        raise TypeError("stego_key must be a str")
-    if not stego_key.strip():
-        raise ValueError("stego_key must be a non-empty string")
-    return hashlib.sha256((stego_key + "|PRNG").encode("utf-8")).digest()
+from src.prng import derive_prng_seed, generate_positions
 
 
 def test_deterministic_same_seed():
@@ -90,46 +82,46 @@ def test_results_are_pure_python_int():
 
 
 def test_derive_prng_seed_length_and_type():
-    seed = draft_derive_prng_seed("kunci-rahasia")
+    seed = derive_prng_seed("kunci-rahasia")
     assert isinstance(seed, bytes)
     assert len(seed) == 32
 
 
 def test_derive_prng_seed_deterministic():
-    assert draft_derive_prng_seed("kunci-sama") == draft_derive_prng_seed("kunci-sama")
+    assert derive_prng_seed("kunci-sama") == derive_prng_seed("kunci-sama")
 
 
 def test_derive_prng_seed_differs_per_key():
-    assert draft_derive_prng_seed("kunci-a") != draft_derive_prng_seed("kunci-b")
+    assert derive_prng_seed("kunci-a") != derive_prng_seed("kunci-b")
 
 
 def test_derive_prng_seed_domain_separation():
     aes_like = hashlib.sha256("kunci-sama|AES".encode("utf-8")).digest()
-    assert draft_derive_prng_seed("kunci-sama") != aes_like
+    assert derive_prng_seed("kunci-sama") != aes_like
 
 
 def test_derive_prng_seed_rejects_blank():
     with pytest.raises(ValueError):
-        draft_derive_prng_seed("")
+        derive_prng_seed("")
     with pytest.raises(ValueError):
-        draft_derive_prng_seed("   ")
+        derive_prng_seed("   ")
 
 
 @pytest.mark.parametrize("bad_key", [b"bytes-key", 123, None])
 def test_derive_prng_seed_rejects_non_str(bad_key):
     with pytest.raises(TypeError):
-        draft_derive_prng_seed(bad_key)
+        derive_prng_seed(bad_key)
 
 
 def test_derived_seed_drives_deterministic_positions():
     total_slots = 64 * 64 * 3
-    first = generate_positions(total_slots, 500, draft_derive_prng_seed("stego-key"))
-    second = generate_positions(total_slots, 500, draft_derive_prng_seed("stego-key"))
+    first = generate_positions(total_slots, 500, derive_prng_seed("stego-key"))
+    second = generate_positions(total_slots, 500, derive_prng_seed("stego-key"))
     assert first == second
 
 
 def test_wrong_key_gives_different_positions():
     total_slots = 64 * 64 * 3
-    right = generate_positions(total_slots, 500, draft_derive_prng_seed("key-benar"))
-    wrong = generate_positions(total_slots, 500, draft_derive_prng_seed("key-salah"))
+    right = generate_positions(total_slots, 500, derive_prng_seed("key-benar"))
+    wrong = generate_positions(total_slots, 500, derive_prng_seed("key-salah"))
     assert right != wrong
