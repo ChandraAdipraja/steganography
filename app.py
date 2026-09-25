@@ -10,20 +10,21 @@ from PIL import Image
 import numpy as np
 
 from src.analysis import calculate_mse, calculate_psnr
-from src.prng import generate_positions
+from src.prng import derive_prng_seed, generate_positions
 from src.steganography import (
+    FULL_OVERHEAD,
+    HEADER_SIZE,
+    bits_to_bytes,
     calculate_capacity,
     embed_payload,
     extract_payload,
     normalize_image,
-    bits_to_bytes,
     parse_header,
-    HEADER_SIZE,
     CapacityError,
     InvalidImageError,
     InvalidPayloadError,
 )
-from src.crypto import decrypt_message, encrypt_message
+from src.crypto import CRYPTO_OVERHEAD_BYTES, decrypt_message, encrypt_message
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "stegocrypt-dev")
@@ -33,11 +34,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def draft_derive_prng_seed(password: str) -> bytes:
-    if not isinstance(password, str):
-        raise TypeError("password must be a str")
-    if not password.strip():
-        raise ValueError("password must be a non-empty string")
-    return hashlib.sha256((password + "|PRNG").encode("utf-8")).digest()
+    # wrapper for backwards compat — delegate ke src.prng.derive_prng_seed
+    return derive_prng_seed(password)
 
 
 @app.route("/")
@@ -73,21 +71,29 @@ def encode_post():
         if image.mode not in {"RGB", "RGBA"}:
             image = image.convert("RGB")
 
-        capacity = calculate_capacity(image)
+        capacity = calculate_capacity(image)  # Opsi A: budget plaintext
+        plain_bytes = message.encode("utf-8")
+        if len(plain_bytes) > capacity:
+            flash(f"Pesan terlalu besar untuk gambar ini. Maks {capacity} byte, pesan {len(plain_bytes)} byte.", "error")
+            return redirect(url_for("encode_page"))
+
         try:
-            payload = encrypt_message(message.encode("utf-8"), password)
+            payload = encrypt_message(plain_bytes, password)
         except ValueError:
             flash("Password tidak boleh kosong.", "error")
             return redirect(url_for("encode_page"))
 
-        if len(payload) > capacity:
-            flash("Pesan terlalu besar untuk gambar ini.", "error")
-            return redirect(url_for("encode_page"))
-
         width, height = image.size
         total_slots = width * height * 3
-        seed = draft_derive_prng_seed(password)
         needed = (HEADER_SIZE + len(payload)) * 8
+        # safety net: blob + header harus muat di slot (harusnya sudah terjamin oleh cek plaintext)
+        if needed > total_slots:
+            flash("Pesan terlalu besar untuk gambar ini (setelah enkripsi).", "error")
+            return redirect(url_for("encode_page"))
+
+        seed = draft_derive_prng_seed(password)
+        # hanya generate sebanyak yang dibutuhkan — hemat untuk gambar besar + pesan kecil
+        # prefix-consistent: generate_positions(total, needed, seed)[:64] == generate_positions(total, 64, seed)
         positions = generate_positions(total_slots, needed, seed)
         stego = embed_payload(image, payload, positions)
 
@@ -155,9 +161,9 @@ def decode_post():
         if total_slots < header_bits_needed:
             flash("Gambar terlalu kecil untuk berisi payload.", "error")
             return redirect(url_for("encode_page") + "#decode")
-        header_positions = generate_positions(
-            total_slots, header_bits_needed, seed
-        )
+        # hemat: generate hanya 64 dulu untuk header, karena prefix-consistent
+        # generate_positions(total, 64, seed) == generate_positions(total, needed, seed)[:64]
+        header_positions = generate_positions(total_slots, header_bits_needed, seed)
         normalized = normalize_image(image)
         flat = np.array(normalized)[:, :, :3].reshape(-1)
         header_bits = [int(flat[p]) & 1 for p in header_positions]

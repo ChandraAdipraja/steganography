@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import random
 
 
@@ -41,3 +42,11 @@ def generate_positions(
         table[j] = vi
         append(vj)
     return out
+
+
+def derive_prng_seed(stego_key: str) -> bytes:
+    if not isinstance(stego_key, str):
+        raise TypeError("stego_key must be a str")
+    if not stego_key.strip():
+        raise ValueError("stego_key must be a non-empty string")
+    return hashlib.sha256((stego_key + "|PRNG").encode("utf-8")).digest()

@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from src.steganography import (
+    FULL_OVERHEAD,
     HEADER_SIZE,
     MAGIC,
     CapacityError,
@@ -77,7 +78,7 @@ def test_rgb_capacity():
 
     capacity = calculate_capacity(image)
 
-    expected = (100 * 100 * 3) // 8 - HEADER_SIZE
+    expected = (100 * 100 * 3) // 8 - FULL_OVERHEAD
 
     assert capacity == expected
 
@@ -87,7 +88,7 @@ def test_rgba_capacity():
 
     capacity = calculate_capacity(image)
 
-    expected = (100 * 100 * 3) // 8 - HEADER_SIZE
+    expected = (100 * 100 * 3) // 8 - FULL_OVERHEAD
 
     assert capacity == expected
 
@@ -99,7 +100,7 @@ def test_embed_and_extract_rgb():
     capacity = calculate_capacity(image)
 
     positions = list(range(
-        (capacity + HEADER_SIZE) * 8
+        (capacity + FULL_OVERHEAD) * 8
     ))
 
     stego = embed_payload(
@@ -127,7 +128,7 @@ def test_embed_and_extract_rgba():
     capacity = calculate_capacity(image)
 
     positions = list(range(
-        (capacity + HEADER_SIZE) * 8
+        (capacity + FULL_OVERHEAD) * 8
     ))
 
     stego = embed_payload(
@@ -157,7 +158,7 @@ def test_embedding_does_not_modify_original():
     capacity = calculate_capacity(image)
 
     positions = list(range(
-        (capacity + HEADER_SIZE) * 8
+        (capacity + FULL_OVERHEAD) * 8
     ))
 
     embed_payload(

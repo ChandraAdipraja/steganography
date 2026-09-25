@@ -13,6 +13,12 @@ MAGIC = b"STG1"
 HEADER_FORMAT = ">4sI"
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
+# Full overhead per AGENTS.md §12: stego header + crypto blob (salt+nonce+tag)
+# Import dari src.crypto — jangan hardcode 44, source of truth adalah CRYPTO_OVERHEAD_BYTES
+from src.crypto import CRYPTO_OVERHEAD_BYTES  # noqa: E402
+
+FULL_OVERHEAD = HEADER_SIZE + CRYPTO_OVERHEAD_BYTES
+
 BITS_PER_CHANNEL = 1
 
 
@@ -69,6 +75,14 @@ def get_used_channels(image: Image.Image) -> int:
 
 
 def calculate_capacity(image: Image.Image) -> int:
+    """
+    Kapasitas maksimum plaintext (byte) yang boleh diketik user.
+
+    Opsi A (AGENTS.md §12): budget plaintext = total slot / 8 - FULL_OVERHEAD,
+    dengan FULL_OVERHEAD = HEADER_SIZE (8, format STG1) + CRYPTO_OVERHEAD_BYTES (44, salt+nonce+tag).
+    Bukan budget blob — cek di app.py harus dilakukan pada panjang plaintext,
+    atau setelah enkripsi bandingkan blob vs (capacity + CRYPTO_OVERHEAD_BYTES).
+    """
     image = normalize_image(image)
     channels = get_used_channels(image)
 
@@ -83,7 +97,7 @@ def calculate_capacity(image: Image.Image) -> int:
 
     capacity_bytes = capacity_bits // 8
 
-    return max(0, capacity_bytes - HEADER_SIZE)
+    return max(0, capacity_bytes - FULL_OVERHEAD)
 
 
 def bytes_to_bits(data: bytes) -> list[int]:
