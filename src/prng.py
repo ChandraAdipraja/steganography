@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import random
 
 
@@ -30,19 +29,15 @@ def generate_positions(
         return []
 
     rng = random.Random(seed)
-    swapped: dict[int, int] = {}
-    result: list[int] = []
+    table: dict[int, int] = {}
+    out: list[int] = []
+    append = out.append
+    get = table.get
     for i in range(num_positions):
         j = rng.randrange(i, total_slots)
-        vi, vj = swapped.get(i, i), swapped.get(j, j)
-        result.append(vj)
-        swapped[j] = vi
-    return result
-
-
-def derive_prng_seed(stego_key: str) -> bytes:
-    if not isinstance(stego_key, str):
-        raise TypeError("stego_key must be a str")
-    if not stego_key.strip():
-        raise ValueError("stego_key must be a non-empty string")
-    return hashlib.sha256((stego_key + "|PRNG").encode("utf-8")).digest()
+        vi = get(i, i)
+        vj = get(j, j)
+        table[i] = vj
+        table[j] = vi
+        append(vj)
+    return out

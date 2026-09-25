@@ -1,4 +1,5 @@
 import os
+import hashlib
 import io
 import uuid
 from pathlib import Path
@@ -6,12 +7,18 @@ from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, flash
 from PIL import Image
 
+import numpy as np
+
 from src.analysis import calculate_mse, calculate_psnr
-from src.prng import derive_prng_seed, generate_positions
+from src.prng import generate_positions
 from src.steganography import (
     calculate_capacity,
     embed_payload,
     extract_payload,
+    normalize_image,
+    bits_to_bytes,
+    parse_header,
+    HEADER_SIZE,
     CapacityError,
     InvalidImageError,
     InvalidPayloadError,
@@ -23,6 +30,14 @@ app.secret_key = os.environ.get("SECRET_KEY", "stegocrypt-dev")
 
 UPLOAD_DIR = Path("static/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def draft_derive_prng_seed(password: str) -> bytes:
+    if not isinstance(password, str):
+        raise TypeError("password must be a str")
+    if not password.strip():
+        raise ValueError("password must be a non-empty string")
+    return hashlib.sha256((password + "|PRNG").encode("utf-8")).digest()
 
 
 @app.route("/")
@@ -71,8 +86,9 @@ def encode_post():
 
         width, height = image.size
         total_slots = width * height * 3
-        seed = derive_prng_seed(password)
-        positions = generate_positions(total_slots, total_slots, seed)
+        seed = draft_derive_prng_seed(password)
+        needed = (HEADER_SIZE + len(payload)) * 8
+        positions = generate_positions(total_slots, needed, seed)
         stego = embed_payload(image, payload, positions)
 
         cover_id = uuid.uuid4().hex[:8]
@@ -134,8 +150,23 @@ def decode_post():
 
         width, height = image.size
         total_slots = width * height * 3
-        seed = derive_prng_seed(password)
-        positions = generate_positions(total_slots, total_slots, seed)
+        seed = draft_derive_prng_seed(password)
+        header_bits_needed = HEADER_SIZE * 8
+        if total_slots < header_bits_needed:
+            flash("Gambar terlalu kecil untuk berisi payload.", "error")
+            return redirect(url_for("encode_page") + "#decode")
+        header_positions = generate_positions(
+            total_slots, header_bits_needed, seed
+        )
+        normalized = normalize_image(image)
+        flat = np.array(normalized)[:, :, :3].reshape(-1)
+        header_bits = [int(flat[p]) & 1 for p in header_positions]
+        payload_length = parse_header(bits_to_bytes(header_bits))
+        needed = (HEADER_SIZE + payload_length) * 8
+        if needed > total_slots:
+            flash("Password salah atau data telah dimodifikasi.", "error")
+            return redirect(url_for("encode_page") + "#decode")
+        positions = generate_positions(total_slots, needed, seed)
         payload = extract_payload(image, positions)
         plaintext = decrypt_message(payload, password)
         decoded = plaintext.decode("utf-8")
