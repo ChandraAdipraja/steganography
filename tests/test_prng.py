@@ -6,6 +6,13 @@ import pytest
 from src.prng import derive_prng_seed, generate_positions
 
 
+def test_prefix_consistency():
+    seed = b"some-seed"
+    full = generate_positions(10_000, 500, seed)
+    prefix = generate_positions(10_000, 100, seed)
+    assert full[:100] == prefix
+
+
 def test_deterministic_same_seed():
     first = generate_positions(1000, 100, b"seed-abc")
     second = generate_positions(1000, 100, b"seed-abc")
