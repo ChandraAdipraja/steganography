@@ -7,9 +7,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style> *{font-family:'Inter',system-ui,-apple-system,sans-serif} </style>
+    <style>
+        *{font-family:'Inter',system-ui,-apple-system,sans-serif}
+        .skip-link{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+        .skip-link:focus{position:absolute;left:8px;top:8px;width:auto;height:auto;overflow:visible;z-index:50;border-radius:8px;background:#18181b;color:#fff;padding:8px 16px;font-size:14px;font-weight:600}
+        .visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+    </style>
 </head>
 <body class="bg-[#FCFCF9] text-zinc-800 antialiased selection:bg-zinc-900 selection:text-white">
+    <a href="#main" class="skip-link">Lewati ke konten</a>
 
     <header class="sticky top-0 z-40 bg-[#FCFCF9]/80 backdrop-blur-md border-b border-zinc-200/60">
         <nav class="max-w-[1120px] mx-auto px-5 lg:px-6 h-[64px] flex items-center justify-between gap-6">
@@ -21,12 +27,12 @@
             </a>
 
             <div class="hidden md:flex items-center gap-6">
-                <a href="/" class="py-2 text-sm font-medium border-b-2 transition {% if request.path == '/' %}border-zinc-900 text-zinc-900{% else %}border-transparent text-zinc-500 hover:text-zinc-900{% endif %}">Beranda</a>
-                <a href="/#tentang" class="py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300 transition">Tentang</a>
-                <a href="/encode" class="py-2 text-sm font-medium border-b-2 transition {% if request.path.startswith('/encode') %}border-zinc-900 text-zinc-900{% else %}border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300{% endif %}">Encode / Decode</a>
+                <a href="/" class="py-2 text-sm font-medium border-b-2 transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm {% if request.path == '/' %}border-zinc-900 text-zinc-900{% else %}border-transparent text-zinc-500 hover:text-zinc-900{% endif %}">Beranda</a>
+                <a href="/#tentang" class="py-2 text-sm font-medium border-b-2 border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300 transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Tentang</a>
+                <a href="/encode" class="py-2 text-sm font-medium border-b-2 transition focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm {% if request.path.startswith('/encode') %}border-zinc-900 text-zinc-900{% else %}border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-300{% endif %}">Encode / Decode</a>
             </div>
 
-            <button id="hamburger" class="md:hidden w-9 h-9 rounded-xl border border-zinc-200 bg-white flex items-center justify-center text-lg leading-none">☰</button>
+            <button id="hamburger" aria-expanded="false" aria-controls="mobile-menu" aria-label="Buka menu navigasi" class="md:hidden w-9 h-9 rounded-xl border border-zinc-200 bg-white flex items-center justify-center text-lg leading-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">☰</button>
         </nav>
 
         <div id="mobile-menu" class="hidden md:hidden border-t border-zinc-200/60 bg-white">
@@ -38,7 +44,7 @@
         </div>
     </header>
 
-    <main>
+    <main id="main">
         {% block content %}{% endblock %}
     </main>
 
@@ -55,7 +61,7 @@
                     <span>Steganography</span><span class="opacity-30">•</span><span>Informatika</span><span class="opacity-30">•</span><span>2026</span>
                 </div>
             </div>
-            <div class="mt-8 pt-6 border-t border-zinc-200/40 flex flex-col md:flex-row justify-between gap-2 text-xs text-zinc-400">
+            <div class="mt-8 pt-6 border-t border-zinc-200/40 flex flex-col md:flex-row justify-between gap-2 text-xs text-zinc-500">
                 <span>© 2026 StegoCrypt. All rights reserved.</span>
                 <span>Built with Flask & Tailwind CSS</span>
             </div>
@@ -66,15 +72,20 @@
         const btn = document.getElementById('hamburger');
         const menu = document.getElementById('mobile-menu');
         if (btn && menu) {
-            btn.addEventListener('click', () => {
-                const open = !menu.classList.contains('hidden');
-                menu.classList.toggle('hidden', open);
-                btn.textContent = open ? '☰' : '✕';
+            const setOpen = (open) => {
+                menu.classList.toggle('hidden', !open);
+                btn.textContent = open ? '✕' : '☰';
+                btn.setAttribute('aria-expanded', String(open));
+                btn.setAttribute('aria-label', open ? 'Tutup menu navigasi' : 'Buka menu navigasi');
+            };
+            btn.addEventListener('click', () => setOpen(menu.classList.contains('hidden')));
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !menu.classList.contains('hidden')) {
+                    setOpen(false);
+                    btn.focus();
+                }
             });
-            menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-                menu.classList.add('hidden');
-                btn.textContent = '☰';
-            }));
+            menu.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setOpen(false)));
         }
         document.querySelectorAll('a[href="/#tentang"]').forEach(a=>{
             a.addEventListener('click', e=>{

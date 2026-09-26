@@ -1,24 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Encode & Decode - StegoCrypt{% endblock %}
+{% block title %}Encode dan Decode - StegoCrypt{% endblock %}
 {% block content %}
 
-<section class="max-w-[1120px] mx-auto px-5 lg:px-6 pt-8 pb-6">
+<section class="max-w-[1120px] mx-auto px-5 lg:px-6 pt-10 pb-6">
     <div class="max-w-[640px]">
-        <div class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-400">StegoCrypt Tool</div>
-        <h1 class="mt-2 text-[32px] font-extrabold tracking-tight leading-none">Encode & Decode</h1>
-        <p class="mt-2 text-sm leading-6 text-zinc-500">Sembunyikan pesan ke dalam gambar atau ekstrak kembali pesan yang telah disisipkan - satu alur, dua mode.</p>
+        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500">StegoCrypt Tool</p>
+        <h1 class="mt-2 text-[32px] font-extrabold tracking-tight leading-none">Encode dan Decode</h1>
+        <p class="mt-2 text-sm leading-6 text-zinc-500">Sembunyikan pesan ke dalam gambar atau ekstrak kembali pesan yang telah disisipkan dalam satu alur yang sama.</p>
     </div>
 
-    <div class="mt-8 border-b border-zinc-200">
+    <div class="mt-8 border-b border-zinc-200" role="tablist" aria-label="Mode tool">
         <div class="flex gap-6">
-            <button id="tab-encode" class="pb-3 border-b-2 border-zinc-900 text-sm font-semibold">Encode</button>
-            <button id="tab-decode" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700">Decode</button>
+            <button id="tab-encode" role="tab" aria-selected="true" aria-controls="panel-encode" class="pb-3 border-b-2 border-zinc-900 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Encode</button>
+            <button id="tab-decode" role="tab" aria-selected="false" aria-controls="panel-decode" tabindex="-1" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Decode</button>
         </div>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <div class="mt-6 space-y-2">
+        <div class="mt-6 space-y-2" role="status" aria-live="polite">
           {% for cat, msg in messages %}
             <div class="px-4 py-3 rounded-xl text-sm {% if cat=='success' %}bg-green-50 border border-green-200 text-green-800{% elif cat=='error' %}bg-red-50 border border-red-200 text-red-800{% else %}bg-zinc-50 border border-zinc-200 text-zinc-700{% endif %}">{{ msg }}</div>
           {% endfor %}
@@ -26,89 +26,140 @@
       {% endif %}
     {% endwith %}
 
-    <div id="panel-encode" class="mt-6 space-y-5">
-        <form method="POST" action="{{ url_for('encode_post') }}" enctype="multipart/form-data" class="space-y-5">
+    <div id="panel-encode" role="tabpanel" aria-labelledby="tab-encode" class="mt-6">
+        <form method="POST" action="{{ url_for('encode_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-                <div class="font-semibold text-sm">01 - Cover Image</div>
-                <p class="text-xs text-zinc-500 mt-1">Format yang didukung: PNG dan BMP. Gambar tidak diubah kecuali pada bit LSB.</p>
-                <label class="mt-4 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50">
-                    <span class="text-sm font-medium">Upload cover image</span>
-                    <span class="text-xs text-zinc-500">PNG atau BMP, drag & drop atau klik</span>
-                    <input type="file" name="cover" accept=".png,.bmp" class="hidden" onchange="previewImage(this,'cover-preview','cover-meta')">
-                </label>
-                <div id="cover-meta" class="hidden mt-4 grid grid-cols-3 gap-3 text-center">
-                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Width</div><div id="cover-w" class="text-sm font-semibold">-</div></div>
-                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Height</div><div id="cover-h" class="text-sm font-semibold">-</div></div>
-                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Max Plaintext</div><div id="cover-c" class="text-sm font-semibold">-</div></div>
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">1</span>
+                    <div>
+                        <label for="cover-input" class="font-semibold text-sm">Cover image</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Format PNG dan BMP. Gambar hanya berubah pada bit LSB.</p>
+                    </div>
                 </div>
-                <p id="cover-cap-note" class="hidden mt-2 text-[11px] text-zinc-500 text-center">Kapasitas = w×h×3/8 − 52 (8 header STG1 + 44 crypto). Angka di atas adalah budget plaintext.</p>
-                <img id="cover-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200">
+                <label for="cover-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload cover image</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <input id="cover-input" type="file" name="cover" accept=".png,.bmp" class="visually-hidden" onchange="previewImage(this,'cover-preview','cover-meta')">
+                </label>
+                <div id="cover-meta" class="mt-4 grid grid-cols-3 gap-3 text-center {% if cover_w is not defined %}hidden{% endif %}">
+                    <div class="rounded-xl border border-zinc-200 py-3 px-2"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Width</div><div id="cover-w" class="text-sm font-semibold">{% if cover_w is defined %}{{ cover_w }}px{% else %}-{% endif %}</div></div>
+                    <div class="rounded-xl border border-zinc-200 py-3 px-2"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Height</div><div id="cover-h" class="text-sm font-semibold">{% if cover_h is defined %}{{ cover_h }}px{% else %}-{% endif %}</div></div>
+                    <div class="rounded-xl border border-zinc-200 py-3 px-2"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Max plaintext</div><div id="cover-c" class="text-sm font-semibold">{% if cover_budget is defined %}{{ "{:,}".format(cover_budget) }} bytes{% else %}-{% endif %}</div></div>
+                </div>
+                <p id="cover-cap-note" class="mt-2 text-[11px] text-zinc-500 text-center {% if cover_w is not defined %}hidden{% endif %}">Kapasitas dihitung dari w x h x 3 / 8 dikurangi 52 byte (8 header, 44 crypto).</p>
+                {% if cover_url is defined %}
+                <img id="cover-preview" src="{{ cover_url }}" class="mt-4 w-full rounded-xl border border-zinc-200" alt="Cover image yang digunakan">
+                {% else %}
+                <img id="cover-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau cover image">
+                {% endif %}
             </div>
 
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-                <div class="font-semibold text-sm">02 - Keamanan</div>
-                <input type="password" name="password" placeholder="Masukkan password..." class="mt-3 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300">
-                <p class="mt-2 text-xs text-zinc-500">Password yang sama menurunkan AES key (untuk enkripsi) dan seed PRNG (untuk posisi pixel).</p>
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">2</span>
+                    <div>
+                        <label for="encode-password" class="font-semibold text-sm">Password</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Password yang sama menurunkan AES key dan seed PRNG.</p>
+                    </div>
+                </div>
+                <input id="encode-password" type="password" name="password" placeholder="Masukkan password" autocomplete="new-password" class="mt-4 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400">
             </div>
 
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-                <div class="font-semibold text-sm">03 - Secret Message</div>
-                <textarea id="message-input" name="message" rows="5" placeholder="Tulis pesan rahasia yang ingin disembunyikan..." class="mt-3 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"></textarea>
-                <p id="message-counter" class="mt-2 text-xs text-zinc-500">Upload cover image dulu untuk melihat budget kapasitas.</p>
-                <p class="mt-1 text-xs text-zinc-500">Pesan akan dienkripsi sebelum disisipkan.</p>
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">3</span>
+                    <div class="flex-1">
+                        <label for="message-input" class="font-semibold text-sm">Secret message</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Pesan dienkripsi sebelum disisipkan.</p>
+                    </div>
+                    <span id="message-counter" class="text-xs text-zinc-500 tabular-nums shrink-0" aria-live="polite">0 bytes</span>
+                </div>
+                <textarea id="message-input" name="message" rows="5" placeholder="Tulis pesan rahasia yang ingin disembunyikan" class="mt-4 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400">{{ message_value | default('', true) }}</textarea>
+                <p id="message-hint" class="mt-2 text-xs text-zinc-500">{% if cover_budget is defined %}Pesan akan dienkripsi sebelum disisipkan.{% else %}Upload cover image dulu untuk melihat budget kapasitas.{% endif %}</p>
             </div>
 
-            <button type="submit" class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition">Encode Message →</button>
+            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Encode Message</button>
         </form>
 
         {% if stego_url %}
-        <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-            <div class="font-semibold text-sm">04 - Result</div>
-            <p class="text-xs text-zinc-500">Bandingkan cover dan stego. Perbedaan visual dirancang minimal.</p>
+        <div id="result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6">
+            <div class="flex items-center gap-3">
+                <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">4</span>
+                <div>
+                    <div class="font-semibold text-sm">Result</div>
+                    <p class="text-xs text-zinc-500 mt-0.5">Bandingkan cover dan stego. Perbedaan visual dirancang minimal.</p>
+                </div>
+            </div>
             <div class="mt-4 grid sm:grid-cols-2 gap-4">
-                <img src="{{ cover_url }}" class="w-full rounded-xl border border-zinc-200" alt="Cover">
-                <img src="{{ stego_url }}" class="w-full rounded-xl border border-zinc-200" alt="Stego">
+                <figure>
+                    <img src="{{ cover_url }}" class="w-full rounded-xl border border-zinc-200" alt="Cover image asli">
+                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Cover</figcaption>
+                </figure>
+                <figure>
+                    <img src="{{ stego_url }}" class="w-full rounded-xl border border-zinc-200" alt="Stego image hasil encode">
+                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Stego</figcaption>
+                </figure>
             </div>
-            <a href="{{ stego_url }}" download="stego.png" class="mt-4 inline-flex w-full justify-center rounded-full bg-zinc-900 text-white py-3 text-sm font-semibold">⬇ Download Stego Image</a>
-            <div class="mt-4 grid grid-cols-3 gap-3 text-center">
-                <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">MSE</div><div class="text-sm font-semibold">{{ mse_display }}</div></div>
-                <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">PSNR</div><div class="text-sm font-semibold">{{ psnr_display }}</div></div>
-                <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase tracking-wide text-zinc-400">Blob</div><div class="text-sm font-semibold">{{ blob_display }}</div></div>
-            </div>
+            <a href="{{ stego_url }}" download="stego.png" class="mt-4 inline-flex w-full justify-center rounded-full border border-zinc-900 bg-white text-zinc-900 py-3 text-sm font-semibold hover:bg-zinc-50 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">Download Stego Image</a>
+            <dl class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">MSE</dt><dd class="text-sm font-semibold tabular-nums">{{ mse_display }}</dd></div>
+                <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">PSNR</dt><dd class="text-sm font-semibold tabular-nums">{{ psnr_display }}</dd></div>
+                <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">Payload size</dt><dd class="text-sm font-semibold tabular-nums">{{ blob_display }}</dd></div>
+            </dl>
+        </div>
+        {% else %}
+        <div class="mt-4 rounded-2xl border border-dashed border-zinc-300 bg-white/60 p-6 text-center">
+            <p class="text-sm text-zinc-500">Hasil encode akan tampil di sini setelah Anda menekan Encode Message.</p>
         </div>
         {% endif %}
     </div>
 
-    <div id="panel-decode" class="hidden mt-6 space-y-5">
-        <form method="POST" action="{{ url_for('decode_post') }}" enctype="multipart/form-data" class="space-y-5">
+    <div id="panel-decode" role="tabpanel" aria-labelledby="tab-decode" class="hidden mt-6">
+        <form method="POST" action="{{ url_for('decode_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-                <div class="font-semibold text-sm">01 - Stego Image</div>
-                <p class="text-xs text-zinc-500 mt-1">Upload PNG atau BMP yang berisi pesan tersembunyi.</p>
-                <label class="mt-4 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50">
-                    <span class="text-sm font-medium">Upload stego image</span>
-                    <input type="file" name="stego" accept=".png,.bmp" class="hidden" onchange="previewImage(this,'stego-preview','stego-meta')">
-                </label>
-                <div id="stego-meta" class="hidden mt-4 grid grid-cols-2 gap-3 text-center">
-                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase text-zinc-400">Width</div><div id="stego-w" class="text-sm font-semibold">-</div></div>
-                    <div class="rounded-xl border border-zinc-200 py-3"><div class="text-[11px] uppercase text-zinc-400">Height</div><div id="stego-h" class="text-sm font-semibold">-</div></div>
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">1</span>
+                    <div>
+                        <label for="stego-input" class="font-semibold text-sm">Stego image</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Upload PNG atau BMP yang berisi pesan tersembunyi.</p>
+                    </div>
                 </div>
-                <img id="stego-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200">
+                <label for="stego-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload stego image</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <input id="stego-input" type="file" name="stego" accept=".png,.bmp" class="visually-hidden" onchange="previewImage(this,'stego-preview','stego-meta')">
+                </label>
+                <div id="stego-meta" class="mt-4 grid grid-cols-2 gap-3 text-center {% if stego_w is not defined %}hidden{% endif %}">
+                    <div class="rounded-xl border border-zinc-200 py-3 px-2"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Width</div><div id="stego-w" class="text-sm font-semibold">{% if stego_w is defined %}{{ stego_w }}px{% else %}-{% endif %}</div></div>
+                    <div class="rounded-xl border border-zinc-200 py-3 px-2"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Height</div><div id="stego-h" class="text-sm font-semibold">{% if stego_h is defined %}{{ stego_h }}px{% else %}-{% endif %}</div></div>
+                </div>
+                {% if stego_preview_url is defined %}
+                <img id="stego-preview" src="{{ stego_preview_url }}" class="mt-4 w-full rounded-xl border border-zinc-200" alt="Stego image yang diekstrak">
+                {% else %}
+                <img id="stego-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau stego image">
+                {% endif %}
             </div>
 
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-                <div class="font-semibold text-sm">02 - Stego-Key / Password</div>
-                <input type="password" name="password" placeholder="Masukkan password pengirim..." class="mt-3 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10">
-                <p class="mt-2 text-xs text-zinc-500">Harus sama dengan password yang digunakan saat encoding.</p>
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">2</span>
+                    <div>
+                        <label for="decode-password" class="font-semibold text-sm">Password pengirim</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Harus sama dengan password yang digunakan saat encoding.</p>
+                    </div>
+                </div>
+                <input id="decode-password" type="password" name="password" placeholder="Masukkan password pengirim" autocomplete="current-password" class="mt-4 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400">
             </div>
 
-            <button type="submit" class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition">Decode Message →</button>
+            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Decode Message</button>
         </form>
 
         {% if decoded_message is defined and decoded_message is not none %}
-        <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-            <div class="font-semibold text-sm">03 - Extracted Message</div>
-            <textarea readonly rows="5" class="mt-3 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">{{ decoded_message }}</textarea>
-            <div class="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">Pesan tersembunyi berhasil diekstrak.</div>
+        <div id="decode-result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6">
+            <div class="font-semibold text-sm">Extracted message</div>
+            <label for="decoded-output" class="visually-hidden">Pesan hasil ekstraksi</label>
+            <textarea id="decoded-output" readonly rows="5" class="mt-3 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm">{{ decoded_message }}</textarea>
+            <div class="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3" role="status">Pesan tersembunyi berhasil diekstrak.</div>
         </div>
         {% endif %}
     </div>
@@ -122,11 +173,43 @@ const tabEncode = document.getElementById('tab-encode');
 const tabDecode = document.getElementById('tab-decode');
 const panelEncode = document.getElementById('panel-encode');
 const panelDecode = document.getElementById('panel-decode');
-function showEncode(){ tabEncode.className='pb-3 border-b-2 border-zinc-900 text-sm font-semibold'; tabDecode.className='pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500'; panelEncode.classList.remove('hidden'); panelDecode.classList.add('hidden'); }
-function showDecode(){ tabDecode.className='pb-3 border-b-2 border-zinc-900 text-sm font-semibold'; tabEncode.className='pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500'; panelDecode.classList.remove('hidden'); panelEncode.classList.add('hidden'); }
+function setTab(mode){
+    const isEncode = mode !== 'decode';
+    tabEncode.setAttribute('aria-selected', String(isEncode));
+    tabDecode.setAttribute('aria-selected', String(!isEncode));
+    tabEncode.tabIndex = isEncode ? 0 : -1;
+    tabDecode.tabIndex = isEncode ? -1 : 0;
+    tabEncode.className = 'pb-3 border-b-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm ' + (isEncode ? 'border-zinc-900 font-semibold' : 'border-transparent font-medium text-zinc-500 hover:text-zinc-700');
+    tabDecode.className = 'pb-3 border-b-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm ' + (!isEncode ? 'border-zinc-900 font-semibold' : 'border-transparent font-medium text-zinc-500 hover:text-zinc-700');
+    panelEncode.classList.toggle('hidden', !isEncode);
+    panelDecode.classList.toggle('hidden', isEncode);
+}
+function showEncode(){ setTab('encode'); history.replaceState(null, '', location.pathname); }
+function showDecode(){ setTab('decode'); history.replaceState(null, '', '#decode'); }
 tabEncode?.addEventListener('click', showEncode);
 tabDecode?.addEventListener('click', showDecode);
-if (location.hash === '#decode') showDecode();
+document.querySelector('[role="tablist"]')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const toDecode = tabEncode.getAttribute('aria-selected') === 'true' ? (e.key === 'ArrowRight') : (e.key === 'ArrowLeft');
+    if (toDecode) { setTab('decode'); tabDecode.focus(); }
+    else { setTab('encode'); tabEncode.focus(); }
+});
+if (location.hash === '#decode') setTab('decode');
+{% if decoded_message is defined and decoded_message is not none %}setTab('decode');{% endif %}
+{% if stego_url is defined %}document.getElementById('result')?.scrollIntoView({block:'start'});{% endif %}
+{% if decoded_message is defined and decoded_message is not none %}document.getElementById('decode-result')?.scrollIntoView({block:'start'});{% endif %}
+updateMessageCounter();
+
+document.querySelectorAll('[data-loading-form]').forEach((form) => {
+    form.addEventListener('submit', () => {
+        const btn = form.querySelector('[data-submit-btn]');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        btn.dataset.label = btn.textContent;
+        btn.textContent = 'Memproses...';
+    });
+});
 
 function previewImage(input, imgId, metaId){
     const file = input.files[0];
@@ -138,7 +221,7 @@ function previewImage(input, imgId, metaId){
     const tmp = new Image();
     tmp.onload = ()=>{
         const w = tmp.width, h = tmp.height;
-        const cap = Math.max(0, Math.floor(w*h*3/8) - 52); // Opsi A: plaintext budget (8 + 44)
+        const cap = Math.max(0, Math.floor(w*h*3/8) - 52);
         if (metaId==='cover-meta'){
             document.getElementById('cover-w').textContent = w+'px';
             document.getElementById('cover-h').textContent = h+'px';
@@ -164,18 +247,23 @@ function coverBudget(){
 function updateMessageCounter(){
     const input = document.getElementById('message-input');
     const counter = document.getElementById('message-counter');
+    const hint = document.getElementById('message-hint');
     if(!input || !counter) return;
     const used = new TextEncoder().encode(input.value).length;
     const budget = coverBudget();
     if(budget === null){
-        counter.textContent = used.toLocaleString()+' bytes. Upload cover image dulu untuk melihat budget kapasitas.';
-        counter.className = 'mt-2 text-xs text-zinc-500';
+        counter.textContent = used.toLocaleString()+' bytes';
+        if (hint) hint.textContent = 'Upload cover image dulu untuk melihat budget kapasitas.';
         return;
     }
-    counter.textContent = used.toLocaleString()+' / '+budget.toLocaleString()+' bytes.';
-    counter.className = used > budget
-        ? 'mt-2 text-xs font-semibold text-red-600'
-        : 'mt-2 text-xs text-zinc-500';
+    counter.textContent = used.toLocaleString()+' / '+budget.toLocaleString()+' bytes';
+    const over = used > budget;
+    counter.className = over
+        ? 'text-xs font-semibold text-red-600 tabular-nums shrink-0'
+        : 'text-xs text-zinc-500 tabular-nums shrink-0';
+    if (hint) hint.textContent = over
+        ? 'Pesan melebihi kapasitas. Kecilkan pesan atau gunakan gambar yang lebih besar.'
+        : 'Pesan akan dienkripsi sebelum disisipkan.';
 }
 document.getElementById('message-input')?.addEventListener('input', updateMessageCounter);
 </script>
