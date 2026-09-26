@@ -2,55 +2,55 @@
 {% block content %}
 
 <section class="max-w-[1120px] mx-auto px-5 lg:px-6 pt-14 pb-10 text-center">
-    <div class="inline-flex items-center gap-3 text-[11px] font-semibold tracking-[0.16em] uppercase text-zinc-400">
-        <span class="w-6 h-px bg-zinc-300"></span>
+    <p class="inline-flex items-center gap-3 text-[11px] font-semibold tracking-[0.16em] uppercase text-zinc-500">
+        <span class="w-6 h-px bg-zinc-300" aria-hidden="true"></span>
         Secure Image Steganography
-        <span class="w-6 h-px bg-zinc-300"></span>
-    </div>
-    <h1 class="mt-5 text-[32px] sm:text-[42px] font-extrabold tracking-[-0.04em] leading-[0.95] text-center ">
+        <span class="w-6 h-px bg-zinc-300" aria-hidden="true"></span>
+    </p>
+    <h1 class="mt-5 text-[32px] sm:text-[42px] font-extrabold tracking-[-0.04em] leading-[1.02] text-center">
         Sembunyikan Pesan Rahasia Di Balik Sebuah Gambar.
     </h1>
     <p class="mt-4 max-w-[560px] mx-auto text-[15px] leading-7 text-zinc-500">
-        StegoCrypt membantu Anda menyisipkan pesan rahasia ke dalam gambar menggunakan kombinasi <span class="font-semibold text-zinc-700">LSB</span>, enkripsi <span class="font-semibold text-zinc-700">AES</span>, dan pengacakan posisi <span class="font-semibold text-zinc-700">PRNG</span> - tanpa jejak visual.
+        StegoCrypt membantu Anda menyisipkan pesan rahasia ke dalam gambar menggunakan kombinasi <span class="font-semibold text-zinc-700">LSB</span>, enkripsi <span class="font-semibold text-zinc-700">AES</span>, dan pengacakan posisi <span class="font-semibold text-zinc-700">PRNG</span>, tanpa jejak visual.
     </p>
     <div class="mt-7">
-        <a href="/encode" class="inline-flex items-center gap-2 px-7 py-3.5 rounded-full bg-zinc-900 text-white text-sm font-semibold shadow hover:bg-black transition">
-            Mulai Sekarang →
+        <a href="/encode" class="inline-flex items-center px-7 py-3.5 rounded-full bg-zinc-900 text-white text-sm font-semibold shadow hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">
+            Buka Tool Encode
         </a>
     </div>
-    <div class="mt-6 text-[11px] tracking-[0.14em] uppercase font-semibold text-zinc-400">PNG · BMP · LSB · AES · PRNG</div>
-    <div class="mt-8 mx-auto w-8 h-0.5 rounded-full bg-zinc-200"></div>
+    <div class="mt-6 text-[11px] tracking-[0.14em] uppercase font-semibold text-zinc-500">PNG · BMP · LSB · AES · PRNG</div>
+    <div class="mt-8 mx-auto w-8 h-0.5 rounded-full bg-zinc-200" aria-hidden="true"></div>
 </section>
 
 <div id="tentang" class="scroll-mt-20"></div>
 
 <section class="max-w-[1120px] mx-auto px-5 lg:px-6 pt-8">
     <div class="max-w-[640px]">
-        <div class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-400">Tentang StegoCrypt</div>
+        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500">Tentang StegoCrypt</p>
         <h2 class="mt-2 text-[26px] font-bold tracking-tight">Keamanan pesan dalam sebuah gambar</h2>
-        <p class="mt-2 text-[15px] leading-7 text-zinc-500">StegoCrypt menggabungkan penyisipan data pada citra, enkripsi, dan pengacakan posisi data untuk menjaga kerahasiaan pesan - dirancang agar tetap natural di mata, kuat di lapisan data.</p>
+        <p class="mt-2 text-[15px] leading-7 text-zinc-500">StegoCrypt menggabungkan penyisipan data pada citra, enkripsi, dan pengacakan posisi data untuk menjaga kerahasiaan pesan, dirancang agar tetap natural di mata dan kuat di lapisan data.</p>
     </div>
 
     <div class="mt-8">
-        <div class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-400 mb-3">Teknologi Utama</div>
+        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500 mb-3">Teknologi Utama</p>
         <div class="grid md:grid-cols-3 gap-4">
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-                <div class="w-10 h-10 rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center">◧</div>
+                <div class="w-10 h-10 rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center text-zinc-700" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L6 21"/></svg></div>
                 <div class="mt-4 font-semibold tracking-tight">LSB Steganografi</div>
                 <p class="mt-2 text-sm leading-6 text-zinc-500">Pesan disisipkan ke bit paling rendah piksel. Perubahan dirancang agar tetap sulit terlihat secara visual.</p>
-                <div class="mt-4 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-400">Least Significant Bit</div>
+                <div class="mt-4 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Least Significant Bit</div>
             </div>
-            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-                <div class="w-10 h-10 rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center">⬢</div>
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6 md:translate-y-2">
+                <div class="w-10 h-10 rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center text-zinc-700" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1.2" fill="currentColor"/></svg></div>
                 <div class="mt-4 font-semibold tracking-tight">Enkripsi AES</div>
-                <p class="mt-2 text-sm leading-6 text-zinc-500">Pesan dienkripsi dulu sebelum disisipkan - data yang tertanam bukan lagi pesan asli.</p>
-                <div class="mt-4 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-400">Advanced Encryption Standard</div>
+                <p class="mt-2 text-sm leading-6 text-zinc-500">Pesan dienkripsi dulu sebelum disisipkan, jadi data yang tertanam bukan lagi pesan asli.</p>
+                <div class="mt-4 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Advanced Encryption Standard</div>
             </div>
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-                <div class="w-10 h-10 rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center">⬣</div>
-                <div class="mt-4 font-semibold tracking-tight">PRNG &amp; Stego-Key</div>
+                <div class="w-10 h-10 rounded-xl border border-zinc-200 bg-zinc-50 flex items-center justify-center text-zinc-700" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg></div>
+                <div class="mt-4 font-semibold tracking-tight">PRNG dan Stego-Key</div>
                 <p class="mt-2 text-sm leading-6 text-zinc-500">Posisi penyisipan diacak pseudo-random dari stego-key, tidak berurutan dan tidak mudah ditebak.</p>
-                <div class="mt-4 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-400">Pseudo-Random Number Generator</div>
+                <div class="mt-4 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Pseudo-Random Number Generator</div>
             </div>
         </div>
     </div>
@@ -58,9 +58,9 @@
     <hr class="my-10 border-zinc-200/60">
 
     <div class="max-w-[640px]">
-        <div class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-400">Cara Kerja</div>
+        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500">Cara Kerja</p>
         <h2 class="mt-2 text-[22px] font-bold tracking-tight">Bagaimana StegoCrypt bekerja?</h2>
-        <p class="mt-1 text-sm leading-6 text-zinc-500">Empat tahap berurutan - dari pesan hingga stego image yang siap dibagikan.</p>
+        <p class="mt-1 text-sm leading-6 text-zinc-500">Empat tahap berurutan, dari pesan hingga stego image yang siap dibagikan.</p>
     </div>
     <div class="mt-6 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="rounded-2xl border border-zinc-200 bg-white p-5">
@@ -88,18 +88,18 @@
     <hr class="my-10 border-zinc-200/60">
 
     <div class="max-w-[640px]">
-        <div class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-400">Dua Lapisan</div>
+        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500">Dua Lapisan</p>
         <h2 class="mt-2 text-[22px] font-bold tracking-tight">Mengapa beberapa lapisan?</h2>
-        <p class="mt-1 text-sm leading-6 text-zinc-500">Tidak hanya menyembunyikan keberadaan pesan, tapi juga melindungi isinya. Enkripsi + steganografi = dua proteksi yang berbeda.</p>
+        <p class="mt-1 text-sm leading-6 text-zinc-500">Tidak hanya menyembunyikan keberadaan pesan, tapi juga melindungi isinya. Enkripsi dan steganografi memberi dua proteksi yang berbeda.</p>
     </div>
     <div class="mt-6 grid md:grid-cols-2 gap-4">
         <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-            <div class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-400">Lapisan 01</div>
+            <div class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Lapisan 01</div>
             <div class="mt-2 font-semibold">Kerahasiaan pesan</div>
             <p class="mt-2 text-sm leading-6 text-zinc-500">Enkripsi membuat isi tidak dapat dibaca langsung bahkan jika ciphertext berhasil diambil.</p>
         </div>
         <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-            <div class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-400">Lapisan 02</div>
+            <div class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Lapisan 02</div>
             <div class="mt-2 font-semibold">Penyembunyian pesan</div>
             <p class="mt-2 text-sm leading-6 text-zinc-500">Steganografi menanam data di dalam gambar sehingga pesan tidak terlihat secara langsung.</p>
         </div>

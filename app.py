@@ -122,6 +122,10 @@ def encode_post():
             mse_display=f"{mse_value:.6f}",
             psnr_display=psnr_display,
             blob_display=f"{len(payload):,} bytes",
+            message_value=message,
+            cover_w=width,
+            cover_h=height,
+            cover_budget=capacity,
         )
 
     except CapacityError:
@@ -176,8 +180,23 @@ def decode_post():
         plaintext = decrypt_message(payload, password)
         decoded = plaintext.decode("utf-8")
 
+        stego_id = uuid.uuid4().hex[:8]
+        stego_preview_path = UPLOAD_DIR / f"{stego_id}_decode_preview.png"
+        if image.mode not in {"RGB", "RGBA"}:
+            preview_img = image.convert("RGB")
+        else:
+            preview_img = image
+        preview_img.save(stego_preview_path, format="PNG")
+        stego_preview_url = url_for("static", filename=f"uploads/{stego_preview_path.name}")
+
         flash("Pesan berhasil diekstrak!", "success")
-        return render_template("encode.html", decoded_message=decoded)
+        return render_template(
+            "encode.html",
+            decoded_message=decoded,
+            stego_preview_url=stego_preview_url,
+            stego_w=width,
+            stego_h=height,
+        )
 
     except InvalidPayloadError:
         flash("Password salah atau data telah dimodifikasi.", "error")
