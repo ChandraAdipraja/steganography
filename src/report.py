@@ -6,6 +6,9 @@ Kontrak per_cover (list of dict):
     verdict, lsb_file, jpeg_file, jpeg_success, jpeg_error
 Kontrak rows (list of dict):
     image, resolution, message_size, payload_size, mse, psnr, extraction_ok
+Kontrak roundtrip (list of dict, opsional):
+    image, message_size, key_status ("Benar"|"Salah"), fail_stage,
+    success (bool), error, recovered ("Yes"|"No")
 """
 
 from __future__ import annotations
@@ -38,6 +41,7 @@ def build_xlsx(
     password_desc: str,
     jpeg_quality: int,
     capacity_note: str = "budget plaintext (Opsi A, FULL_OVERHEAD=52)",
+    roundtrip=None,
 ):
     """Tulis workbook ke path file atau file-like object (mis. BytesIO)."""
     try:
@@ -167,5 +171,21 @@ def build_xlsx(
     for col, w in zip("ABCDEFG", [26, 22, 22, 22, 22, 34, 40]):
         ws5.column_dimensions[col].width = w
     style_header(ws5, 7)
+
+    # ---- Sheet 6: Encode_Decode (roundtrip benar/salah kunci) ----
+    if roundtrip:
+        ws6 = wb.create_sheet("Encode_Decode")
+        headers6 = ["Citra", "Ukuran Pesan", "Stego-Key (Benar/Salah)",
+                    "Tahap Gagal", "Success (TRUE/FALSE)", "Error",
+                    "Pesan Dipulihkan (Yes/No)"]
+        ws6.append(headers6)
+        for case in roundtrip:
+            ws6.append([case["image"], case["message_size"],
+                        case["key_status"], case["fail_stage"],
+                        bool(case["success"]), case["error"],
+                        case["recovered"]])
+        for col, w in zip("ABCDEFG", [26, 13, 22, 20, 20, 48, 22]):
+            ws6.column_dimensions[col].width = w
+        style_header(ws6, 7)
 
     wb.save(dest)

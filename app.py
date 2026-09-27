@@ -27,6 +27,7 @@ from src.analysis import (
 )
 from src.prng import derive_prng_seed, generate_positions
 from src.report import build_xlsx, channel_maxdiff
+from src.roundtrip import run_codec_case
 from src.steganography import (
     FULL_OVERHEAD,
     HEADER_SIZE,
@@ -625,6 +626,7 @@ def analysis_dataset_download(batch_id):
     summary = json.loads(summary_path.read_text())
     rows = []
     per_cover = []
+    roundtrip = []
     for e in summary["images"]:
         for label, size in DATASET_PAYLOADS:
             p = e["payloads"].get(label, {})
@@ -638,6 +640,31 @@ def analysis_dataset_download(batch_id):
                 "mse": p["mse"],
                 "psnr": float("inf") if p["psnr"] is None else p["psnr"],
                 "extraction_ok": p["ok"],
+            })
+            # Baris Benar pakai ulang hasil batch (ok sudah diverifikasi
+            # roundtrip penuh saat generate — tanpa komputasi ulang)
+            roundtrip.append({
+                "image": e["name"],
+                "message_size": p["size"],
+                "key_status": "Benar",
+                "fail_stage": "selesai" if p["ok"] else "verifikasi pesan",
+                "success": bool(p["ok"]),
+                "error": "-",
+                "recovered": "Yes" if p["ok"] else "No",
+            })
+        # kasus kunci Salah: pakai ulang stego medium, decode password salah
+        # (password asli tidak disimpan — password salah apa pun tetap gagal
+        # di tahap header karena seed PRNG berbeda)
+        med = e["payloads"].get("medium", {})
+        if med.get("stego_file"):
+            stego = Image.open(batch_dir / med["stego_file"])
+            plain = _dataset_plaintext(med["size"])
+            detail = run_codec_case(
+                Image.open(batch_dir / e["cover_file"]), plain,
+                "", "uji-kunci-salah", "Salah", stego=stego,
+            )
+            roundtrip.append({
+                "image": e["name"], "message_size": med["size"], **detail,
             })
         if e.get("hist_file"):
             med = e["payloads"].get("medium", {})
@@ -673,6 +700,7 @@ def analysis_dataset_download(batch_id):
         message_desc="16 / 256 / 1024 byte plaintext (sintetis deterministik)",
         password_desc="satu password untuk semua citra (tidak disimpan)",
         jpeg_quality=summary.get("jpeg_quality", DATASET_JPEG_QUALITY),
+        roundtrip=roundtrip,
     )
     buf.seek(0)
     return send_file(
