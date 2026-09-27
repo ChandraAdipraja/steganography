@@ -19,3 +19,9 @@ node_modules/
 
 uploads/
 outputs/
+
+docs/results/*.xlsx
+docs/results/histogram_*.png
+docs/results/jpeg_*.jpg
+docs/results/lsb_*.png
+docs/results/stego_*.png

@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block title %}Analysis - StegoCrypt{% endblock %}
+{% block content %}
+
+<section class="max-w-[1120px] mx-auto px-5 lg:px-6 pt-10 pb-6">
+    <div class="max-w-[640px]">
+        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500">StegoCrypt Tool</p>
+        <h1 class="mt-2 text-[32px] font-extrabold tracking-tight leading-none">Analysis</h1>
+        <p class="mt-2 text-sm leading-6 text-zinc-500">Bandingkan cover dan stego secara statistik dan visual, atau uji sekumpulan citra sekaligus lewat tab Uji Dataset.</p>
+    </div>
+
+    <div class="mt-8 border-b border-zinc-200" role="tablist" aria-label="Mode analisis">
+        <div class="flex gap-6">
+            <button id="tab-histogram" role="tab" aria-selected="true" aria-controls="panel-histogram" class="pb-3 border-b-2 border-zinc-900 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Histogram</button>
+            <button id="tab-lsb" role="tab" aria-selected="false" aria-controls="panel-lsb" tabindex="-1" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Steganalisis Visual (LSB)</button>
+            <button id="tab-dataset" role="tab" aria-selected="false" aria-controls="panel-dataset" tabindex="-1" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Uji Dataset</button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mt-6 space-y-2" role="status" aria-live="polite">
+          {% for cat, msg in messages %}
+            <div class="px-4 py-3 rounded-xl text-sm {% if cat=='success' %}bg-green-50 border border-green-200 text-green-800{% elif cat=='error' %}bg-red-50 border border-red-200 text-red-800{% else %}bg-zinc-50 border border-zinc-200 text-zinc-700{% endif %}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Histogram panel -->
+    <div id="panel-histogram" role="tabpanel" aria-labelledby="tab-histogram" class="mt-6">
+        <form method="POST" action="{{ url_for('analysis_histogram_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">1</span>
+                    <div>
+                        <label for="hist-cover-input" class="font-semibold text-sm">Cover image</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Gambar asli sebelum disisipi pesan.</p>
+                    </div>
+                </div>
+                <label for="hist-cover-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload cover image</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <input id="hist-cover-input" type="file" name="cover" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'hist-cover-preview')">
+                </label>
+                <img id="hist-cover-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau cover image">
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">2</span>
+                    <div>
+                        <label for="hist-stego-input" class="font-semibold text-sm">Stego image</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Gambar yang sudah disisipi pesan, ukuran sama dengan cover.</p>
+                    </div>
+                </div>
+                <label for="hist-stego-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload stego image</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <input id="hist-stego-input" type="file" name="stego" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'hist-stego-preview')">
+                </label>
+                <img id="hist-stego-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau stego image">
+            </div>
+
+            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Bandingkan Histogram</button>
+        </form>
+
+        {% if histogram_b64 is defined %}
+        <div id="histogram-result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6">
+            <div class="font-semibold text-sm">Hasil perbandingan</div>
+            <img src="{{ histogram_b64 }}" class="mt-4 w-full rounded-xl border border-zinc-200" alt="Grafik histogram cover vs stego per channel RGB">
+            <dl class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
+                <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">MSE</dt><dd class="text-sm font-semibold tabular-nums">{{ hist_mse }}</dd></div>
+                <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">PSNR</dt><dd class="text-sm font-semibold tabular-nums">{{ hist_psnr }}</dd></div>
+            </dl>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- LSB panel -->
+    <div id="panel-lsb" role="tabpanel" aria-labelledby="tab-lsb" class="hidden mt-6">
+        <form method="POST" action="{{ url_for('analysis_lsb_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">1</span>
+                    <div>
+                        <label for="lsb-input" class="font-semibold text-sm">Gambar</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Bit LSB tiap channel divisualkan agar pola sisipan terlihat.</p>
+                    </div>
+                </div>
+                <label for="lsb-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload gambar</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <input id="lsb-input" type="file" name="image" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'lsb-preview')">
+                </label>
+                <img id="lsb-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau gambar">
+            </div>
+
+            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Tampilkan Bidang LSB</button>
+        </form>
+
+        {% if lsb_b64 is defined %}
+        <div id="lsb-result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6">
+            <div class="font-semibold text-sm">Bidang LSB</div>
+            <p class="text-xs text-zinc-500 mt-0.5">Kiri gambar asli, kanan visualisasi bit LSB-nya.</p>
+            <div class="mt-4 grid sm:grid-cols-2 gap-4">
+                <figure>
+                    <img src="{{ lsb_orig_b64 }}" class="w-full rounded-xl border border-zinc-200" alt="Gambar asli">
+                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Asli</figcaption>
+                </figure>
+                <figure>
+                    <img src="{{ lsb_b64 }}" class="w-full rounded-xl border border-zinc-200" alt="Visualisasi bidang LSB">
+                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Bidang LSB</figcaption>
+                </figure>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Dataset panel -->
+    <div id="panel-dataset" role="tabpanel" aria-labelledby="tab-dataset" class="hidden mt-6">
+        <form method="POST" action="{{ url_for('analysis_dataset_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">1</span>
+                    <div>
+                        <label for="dataset-input" class="font-semibold text-sm">Dataset citra</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Upload 1–10 file PNG. Tiap citra otomatis diuji 3 payload: kecil 16 B, sedang 256 B, besar 1024 B.</p>
+                    </div>
+                </div>
+                <label for="dataset-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload dataset (bisa banyak file)</span>
+                    <span class="text-xs text-zinc-500">PNG saja, maks 1024px, klik untuk memilih file</span>
+                    <input id="dataset-input" type="file" name="dataset" accept=".png" multiple class="visually-hidden" onchange="previewDatasetFiles(this)">
+                </label>
+                <div id="dataset-filelist" class="hidden mt-3 text-xs text-zinc-600 space-y-1"></div>
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">2</span>
+                    <div>
+                        <label for="dataset-password" class="font-semibold text-sm">Password</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Satu password dipakai untuk semua citra.</p>
+                    </div>
+                </div>
+                <input id="dataset-password" type="password" name="password" placeholder="Masukkan password" autocomplete="new-password" class="mt-4 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400">
+            </div>
+
+            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Generate Pengujian Dataset</button>
+        </form>
+
+        {% if dataset_batch is defined %}
+        <div id="dataset-result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <div class="font-semibold text-sm">Hasil uji dataset</div>
+                    <p class="text-xs text-zinc-500 mt-0.5">{{ dataset_batch.images | length }} citra × 3 payload. Pilih citra lewat dropdown.</p>
+                </div>
+                <a href="{{ url_for('analysis_dataset_download', batch_id=dataset_batch.batch_id) }}" class="inline-flex justify-center rounded-full bg-zinc-900 text-white px-6 py-2.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">Download XLSX Lengkap</a>
+            </div>
+
+            <div class="grid sm:grid-cols-2 gap-3">
+                <div>
+                    <label for="dataset-select" class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Citra</label>
+                    <select id="dataset-select" class="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"></select>
+                </div>
+                <div>
+                    <span class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Payload</span>
+                    <div id="dataset-pills" class="mt-1 flex gap-2" role="group" aria-label="Ukuran payload">
+                        <button type="button" data-size="small" class="flex-1 rounded-xl border px-3 py-2.5 text-sm">Kecil 16 B</button>
+                        <button type="button" data-size="medium" class="flex-1 rounded-xl border px-3 py-2.5 text-sm">Sedang 256 B</button>
+                        <button type="button" data-size="large" class="flex-1 rounded-xl border px-3 py-2.5 text-sm">Besar 1024 B</button>
+                    </div>
+                </div>
+            </div>
+
+            <dl id="dataset-metrics" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center"></dl>
+
+            <div>
+                <div class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Histogram cover vs stego</div>
+                <img id="dataset-hist" class="mt-2 w-full rounded-xl border border-zinc-200" alt="Histogram cover vs stego citra terpilih">
+            </div>
+
+            <div>
+                <div class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Steganalisis — cover vs stego (pesan terlihat di bidang LSB)</div>
+                <div class="mt-2 grid sm:grid-cols-2 gap-4">
+                    <figure>
+                        <img id="dataset-cover" class="w-full rounded-xl border border-zinc-200" alt="Cover image terpilih">
+                        <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Cover</figcaption>
+                    </figure>
+                    <figure>
+                        <img id="dataset-stego" class="w-full rounded-xl border border-zinc-200" alt="Stego image terpilih">
+                        <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Stego</figcaption>
+                    </figure>
+                    <figure>
+                        <img id="dataset-lsb-cover" class="w-full rounded-xl border border-zinc-200" alt="Bidang LSB cover">
+                        <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Bidang LSB cover</figcaption>
+                    </figure>
+                    <figure>
+                        <img id="dataset-lsb-stego" class="w-full rounded-xl border border-zinc-200" alt="Bidang LSB stego">
+                        <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Bidang LSB stego</figcaption>
+                    </figure>
+                </div>
+            </div>
+
+            <p id="dataset-jpeg-note" class="text-xs text-zinc-500"></p>
+        </div>
+        <script id="dataset-data" type="application/json">{{ dataset_json | safe }}</script>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const tabs = ['histogram', 'lsb', 'dataset'];
+function setTab(mode){
+    if (!tabs.includes(mode)) mode = 'histogram';
+    tabs.forEach((t) => {
+        const tab = document.getElementById('tab-' + t);
+        const panel = document.getElementById('panel-' + t);
+        const active = t === mode;
+        tab.setAttribute('aria-selected', String(active));
+        tab.tabIndex = active ? 0 : -1;
+        tab.className = 'pb-3 border-b-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm ' + (active ? 'border-zinc-900 font-semibold' : 'border-transparent font-medium text-zinc-500 hover:text-zinc-700');
+        panel.classList.toggle('hidden', !active);
+    });
+}
+tabs.forEach((t) => {
+    document.getElementById('tab-' + t)?.addEventListener('click', () => setTab(t));
+});
+document.querySelector('[role="tablist"]')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const current = tabs.findIndex((t) => document.getElementById('tab-' + t).getAttribute('aria-selected') === 'true');
+    const next = (current + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+    setTab(tabs[next]);
+    document.getElementById('tab-' + tabs[next]).focus();
+});
+setTab('{{ active_tab | default("histogram", true) }}');
+{% if histogram_b64 is defined %}document.getElementById('histogram-result')?.scrollIntoView({block:'start'});{% endif %}
+{% if lsb_b64 is defined %}document.getElementById('lsb-result')?.scrollIntoView({block:'start'});{% endif %}
+{% if dataset_batch is defined %}document.getElementById('dataset-result')?.scrollIntoView({block:'start'});{% endif %}
+(function(){
+    const dataEl = document.getElementById('dataset-data');
+    if (!dataEl) return;
+    let batch;
+    try { batch = JSON.parse(dataEl.textContent); } catch(e) { return; }
+    const sel = document.getElementById('dataset-select');
+    const pills = Array.from(document.querySelectorAll('#dataset-pills button'));
+    let imgIdx = 0, size = 'medium';
+    batch.images.forEach((im, i) => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = im.name + ' (' + im.resolution + ')';
+        sel.appendChild(opt);
+    });
+    function metricCell(label, value){
+        return '<div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">' + label + '</dt><dd class="text-sm font-semibold tabular-nums">' + value + '</dd></div>';
+    }
+    function render(){
+        const im = batch.images[imgIdx];
+        const p = im.payloads[size];
+        pills.forEach((b) => {
+            const on = b.dataset.size === size;
+            b.className = 'flex-1 rounded-xl border px-3 py-2.5 text-sm transition ' + (on ? 'border-zinc-900 bg-zinc-900 text-white font-semibold' : 'border-zinc-200 hover:bg-zinc-50');
+        });
+        const metrics = document.getElementById('dataset-metrics');
+        if (!p || p.skipped) {
+            metrics.innerHTML = metricCell('Status', 'Payload ' + size + ' dilewati (melebihi kapasitas)');
+            ['dataset-hist','dataset-cover','dataset-stego','dataset-lsb-cover','dataset-lsb-stego'].forEach((id) => { document.getElementById(id)?.removeAttribute('src'); });
+        } else {
+            metrics.innerHTML = metricCell('MSE', p.mse) + metricCell('PSNR', p.psnr + (p.psnr === 'inf' ? '' : ' dB')) + metricCell('Ekstraksi', p.ok ? 'OK' : 'Gagal') + metricCell('Histogram', im.hist_verdict || '-');
+            document.getElementById('dataset-hist').src = p.hist_url;
+            document.getElementById('dataset-stego').src = p.stego_url;
+            document.getElementById('dataset-lsb-stego').src = p.lsb_stego_url;
+        }
+        document.getElementById('dataset-cover').src = im.cover_url;
+        document.getElementById('dataset-lsb-cover').src = im.lsb_cover_url;
+        const j = im.jpeg || {};
+        document.getElementById('dataset-jpeg-note').textContent = 'Uji JPEG (Q90): ' + (j.success ? 'pesan masih bisa diekstrak (tidak umum untuk LSB).' : 'pesan tidak bisa diekstrak — hasil yang diharapkan untuk LSB lossy.' + (j.error ? ' (' + j.error + ')' : ''));
+    }
+    sel.addEventListener('change', () => { imgIdx = parseInt(sel.value, 10) || 0; render(); });
+    pills.forEach((b) => b.addEventListener('click', () => { size = b.dataset.size; render(); }));
+    render();
+})();
+function previewDatasetFiles(input){
+    const box = document.getElementById('dataset-filelist');
+    const files = Array.from(input.files || []);
+    if (!files.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    box.classList.remove('hidden');
+    box.innerHTML = files.map((f) => '<div>• ' + f.name + ' (' + Math.round(f.size/1024) + ' KB)</div>').join('');
+}
+
+document.querySelectorAll('[data-loading-form]').forEach((form) => {
+    form.addEventListener('submit', () => {
+        const btn = form.querySelector('[data-submit-btn]');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        btn.dataset.label = btn.textContent;
+        btn.textContent = 'Memproses...';
+    });
+});
+
+function previewFile(input, imgId){
+    const file = input.files[0];
+    if(!file) return;
+    const img = document.getElementById(imgId);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        img.src = e.target.result;
+        img.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+}
+</script>
+{% endblock %}
