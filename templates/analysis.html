@@ -6,14 +6,14 @@
     <div class="max-w-[640px]">
         <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500">StegoCrypt Tool</p>
         <h1 class="mt-2 text-[32px] font-extrabold tracking-tight leading-none">Analysis</h1>
-        <p class="mt-2 text-sm leading-6 text-zinc-500">Bandingkan cover dan stego secara statistik dan visual, lalu uji ketahanan pesan terhadap kompresi JPEG.</p>
+        <p class="mt-2 text-sm leading-6 text-zinc-500">Bandingkan cover dan stego secara statistik dan visual, atau uji sekumpulan citra sekaligus lewat tab Uji Dataset.</p>
     </div>
 
     <div class="mt-8 border-b border-zinc-200" role="tablist" aria-label="Mode analisis">
         <div class="flex gap-6">
             <button id="tab-histogram" role="tab" aria-selected="true" aria-controls="panel-histogram" class="pb-3 border-b-2 border-zinc-900 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Histogram</button>
             <button id="tab-lsb" role="tab" aria-selected="false" aria-controls="panel-lsb" tabindex="-1" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Steganalisis Visual (LSB)</button>
-            <button id="tab-jpeg" role="tab" aria-selected="false" aria-controls="panel-jpeg" tabindex="-1" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Uji Kerapuhan JPEG</button>
+            <button id="tab-dataset" role="tab" aria-selected="false" aria-controls="panel-dataset" tabindex="-1" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Uji Dataset</button>
         </div>
     </div>
 
@@ -117,82 +117,96 @@
         {% endif %}
     </div>
 
-    <!-- JPEG panel -->
-    <div id="panel-jpeg" role="tabpanel" aria-labelledby="tab-jpeg" class="hidden mt-6">
-        <form method="POST" action="{{ url_for('analysis_jpeg_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
+    <!-- Dataset panel -->
+    <div id="panel-dataset" role="tabpanel" aria-labelledby="tab-dataset" class="hidden mt-6">
+        <form method="POST" action="{{ url_for('analysis_dataset_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
                 <div class="flex items-center gap-3">
                     <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">1</span>
                     <div>
-                        <label for="jpeg-input" class="font-semibold text-sm">Stego image</label>
-                        <p class="text-xs text-zinc-500 mt-0.5">Gambar akan dikonversi ke JPEG lalu dicoba diekstrak.</p>
+                        <label for="dataset-input" class="font-semibold text-sm">Dataset citra</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Upload 1–10 file PNG. Tiap citra otomatis diuji 3 payload: kecil 16 B, sedang 256 B, besar 1024 B.</p>
                     </div>
                 </div>
-                <label for="jpeg-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
-                    <span class="text-sm font-medium">Upload stego image</span>
-                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
-                    <input id="jpeg-input" type="file" name="stego" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'jpeg-preview')">
+                <label for="dataset-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload dataset (bisa banyak file)</span>
+                    <span class="text-xs text-zinc-500">PNG saja, maks 1024px, klik untuk memilih file</span>
+                    <input id="dataset-input" type="file" name="dataset" accept=".png" multiple class="visually-hidden" onchange="previewDatasetFiles(this)">
                 </label>
-                <img id="jpeg-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau stego image">
+                <div id="dataset-filelist" class="hidden mt-3 text-xs text-zinc-600 space-y-1"></div>
             </div>
 
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
                 <div class="flex items-center gap-3">
                     <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">2</span>
                     <div>
-                        <label for="jpeg-password" class="font-semibold text-sm">Password</label>
-                        <p class="text-xs text-zinc-500 mt-0.5">Password yang dipakai saat encoding.</p>
+                        <label for="dataset-password" class="font-semibold text-sm">Password</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Satu password dipakai untuk semua citra.</p>
                     </div>
                 </div>
-                <input id="jpeg-password" type="password" name="password" placeholder="Masukkan password" autocomplete="current-password" class="mt-4 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400">
+                <input id="dataset-password" type="password" name="password" placeholder="Masukkan password" autocomplete="new-password" class="mt-4 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400">
             </div>
 
-            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
-                <div class="flex items-center gap-3">
-                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">3</span>
-                    <div>
-                        <div class="font-semibold text-sm" id="jpeg-quality-label">Kualitas JPEG</div>
-                        <p class="text-xs text-zinc-500 mt-0.5">Semakin rendah, kompresi semakin agresif.</p>
-                    </div>
-                </div>
-                <div class="mt-4 flex gap-3" role="radiogroup" aria-labelledby="jpeg-quality-label">
-                    <label class="flex-1 rounded-xl border border-zinc-200 px-4 py-3 text-sm text-center cursor-pointer has-checked:border-zinc-900 has-checked:bg-zinc-50 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
-                        <input type="radio" name="quality" value="90" class="accent-zinc-900" {% if jpeg_quality is not defined or jpeg_quality == 90 %}checked{% endif %}> 90
-                    </label>
-                    <label class="flex-1 rounded-xl border border-zinc-200 px-4 py-3 text-sm text-center cursor-pointer has-checked:border-zinc-900 has-checked:bg-zinc-50 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
-                        <input type="radio" name="quality" value="70" class="accent-zinc-900" {% if jpeg_quality is defined and jpeg_quality == 70 %}checked{% endif %}> 70
-                    </label>
-                    <label class="flex-1 rounded-xl border border-zinc-200 px-4 py-3 text-sm text-center cursor-pointer has-checked:border-zinc-900 has-checked:bg-zinc-50 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
-                        <input type="radio" name="quality" value="50" class="accent-zinc-900" {% if jpeg_quality is defined and jpeg_quality == 50 %}checked{% endif %}> 50
-                    </label>
-                </div>
-            </div>
-
-            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Uji Kerapuhan JPEG</button>
+            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Generate Pengujian Dataset</button>
         </form>
 
-        {% if jpeg_success is defined %}
-        <div id="jpeg-result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6">
-            <div class="font-semibold text-sm">Hasil uji kerapuhan (kualitas {{ jpeg_quality }})</div>
-            {% if jpeg_success %}
-            <div class="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3" role="status">Pesan masih bisa diekstrak setelah konversi JPEG. Ini tidak umum untuk LSB — periksa kembali logika pengujiannya.</div>
-            {% else %}
-            <div class="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3" role="status">Pesan tidak bisa diekstrak setelah konversi JPEG{% if jpeg_error %}: {{ jpeg_error }}{% endif %}. Ini hasil yang diharapkan secara teori — LSB rapuh terhadap kompresi lossy JPEG, bukan bug.</div>
-            {% endif %}
-            {% if jpeg_stego_url is defined and jpeg_url is defined and jpeg_url %}
-            <div class="mt-4 grid sm:grid-cols-2 gap-4">
-                <figure>
-                    <img src="{{ jpeg_stego_url }}" class="w-full rounded-xl border border-zinc-200" alt="Stego PNG asli">
-                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Stego PNG</figcaption>
-                </figure>
-                <figure>
-                    <img src="{{ jpeg_url }}" class="w-full rounded-xl border border-zinc-200" alt="Hasil konversi JPEG">
-                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">JPEG hasil konversi</figcaption>
-                </figure>
+        {% if dataset_batch is defined %}
+        <div id="dataset-result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <div class="font-semibold text-sm">Hasil uji dataset</div>
+                    <p class="text-xs text-zinc-500 mt-0.5">{{ dataset_batch.images | length }} citra × 3 payload. Pilih citra lewat dropdown.</p>
+                </div>
+                <a href="{{ url_for('analysis_dataset_download', batch_id=dataset_batch.batch_id) }}" class="inline-flex justify-center rounded-full bg-zinc-900 text-white px-6 py-2.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">Download XLSX Lengkap</a>
             </div>
-            <a href="{{ jpeg_url }}" download="stego_converted.jpg" class="mt-4 inline-flex w-full justify-center rounded-full border border-zinc-900 bg-white text-zinc-900 py-3 text-sm font-semibold hover:bg-zinc-50 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">Download JPEG Hasil Konversi</a>
-            {% endif %}
+
+            <div class="grid sm:grid-cols-2 gap-3">
+                <div>
+                    <label for="dataset-select" class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Citra</label>
+                    <select id="dataset-select" class="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"></select>
+                </div>
+                <div>
+                    <span class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Payload</span>
+                    <div id="dataset-pills" class="mt-1 flex gap-2" role="group" aria-label="Ukuran payload">
+                        <button type="button" data-size="small" class="flex-1 rounded-xl border px-3 py-2.5 text-sm">Kecil 16 B</button>
+                        <button type="button" data-size="medium" class="flex-1 rounded-xl border px-3 py-2.5 text-sm">Sedang 256 B</button>
+                        <button type="button" data-size="large" class="flex-1 rounded-xl border px-3 py-2.5 text-sm">Besar 1024 B</button>
+                    </div>
+                </div>
+            </div>
+
+            <dl id="dataset-metrics" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center"></dl>
+
+            <div>
+                <div class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Histogram cover vs stego</div>
+                <img id="dataset-hist" class="mt-2 w-full rounded-xl border border-zinc-200" alt="Histogram cover vs stego citra terpilih">
+            </div>
+
+            <div>
+                <div class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Steganalisis — cover vs stego (pesan terlihat di bidang LSB)</div>
+                <div class="mt-2 grid sm:grid-cols-2 gap-4">
+                    <figure>
+                        <img id="dataset-cover" class="w-full rounded-xl border border-zinc-200" alt="Cover image terpilih">
+                        <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Cover</figcaption>
+                    </figure>
+                    <figure>
+                        <img id="dataset-stego" class="w-full rounded-xl border border-zinc-200" alt="Stego image terpilih">
+                        <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Stego</figcaption>
+                    </figure>
+                    <figure>
+                        <img id="dataset-lsb-cover" class="w-full rounded-xl border border-zinc-200" alt="Bidang LSB cover">
+                        <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Bidang LSB cover</figcaption>
+                    </figure>
+                    <figure>
+                        <img id="dataset-lsb-stego" class="w-full rounded-xl border border-zinc-200" alt="Bidang LSB stego">
+                        <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Bidang LSB stego</figcaption>
+                    </figure>
+                </div>
+            </div>
+
+            <p id="dataset-jpeg-note" class="text-xs text-zinc-500"></p>
         </div>
+        <script id="dataset-data" type="application/json">{{ dataset_json | safe }}</script>
         {% endif %}
     </div>
 </section>
@@ -201,7 +215,7 @@
 
 {% block scripts %}
 <script>
-const tabs = ['histogram', 'lsb', 'jpeg'];
+const tabs = ['histogram', 'lsb', 'dataset'];
 function setTab(mode){
     if (!tabs.includes(mode)) mode = 'histogram';
     tabs.forEach((t) => {
@@ -228,7 +242,57 @@ document.querySelector('[role="tablist"]')?.addEventListener('keydown', (e) => {
 setTab('{{ active_tab | default("histogram", true) }}');
 {% if histogram_b64 is defined %}document.getElementById('histogram-result')?.scrollIntoView({block:'start'});{% endif %}
 {% if lsb_b64 is defined %}document.getElementById('lsb-result')?.scrollIntoView({block:'start'});{% endif %}
-{% if jpeg_success is defined %}document.getElementById('jpeg-result')?.scrollIntoView({block:'start'});{% endif %}
+{% if dataset_batch is defined %}document.getElementById('dataset-result')?.scrollIntoView({block:'start'});{% endif %}
+(function(){
+    const dataEl = document.getElementById('dataset-data');
+    if (!dataEl) return;
+    let batch;
+    try { batch = JSON.parse(dataEl.textContent); } catch(e) { return; }
+    const sel = document.getElementById('dataset-select');
+    const pills = Array.from(document.querySelectorAll('#dataset-pills button'));
+    let imgIdx = 0, size = 'medium';
+    batch.images.forEach((im, i) => {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = im.name + ' (' + im.resolution + ')';
+        sel.appendChild(opt);
+    });
+    function metricCell(label, value){
+        return '<div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">' + label + '</dt><dd class="text-sm font-semibold tabular-nums">' + value + '</dd></div>';
+    }
+    function render(){
+        const im = batch.images[imgIdx];
+        const p = im.payloads[size];
+        pills.forEach((b) => {
+            const on = b.dataset.size === size;
+            b.className = 'flex-1 rounded-xl border px-3 py-2.5 text-sm transition ' + (on ? 'border-zinc-900 bg-zinc-900 text-white font-semibold' : 'border-zinc-200 hover:bg-zinc-50');
+        });
+        const metrics = document.getElementById('dataset-metrics');
+        if (!p || p.skipped) {
+            metrics.innerHTML = metricCell('Status', 'Payload ' + size + ' dilewati (melebihi kapasitas)');
+            ['dataset-hist','dataset-cover','dataset-stego','dataset-lsb-cover','dataset-lsb-stego'].forEach((id) => { document.getElementById(id)?.removeAttribute('src'); });
+        } else {
+            metrics.innerHTML = metricCell('MSE', p.mse) + metricCell('PSNR', p.psnr + (p.psnr === 'inf' ? '' : ' dB')) + metricCell('Ekstraksi', p.ok ? 'OK' : 'Gagal') + metricCell('Histogram', im.hist_verdict || '-');
+            document.getElementById('dataset-hist').src = p.hist_url;
+            document.getElementById('dataset-stego').src = p.stego_url;
+            document.getElementById('dataset-lsb-stego').src = p.lsb_stego_url;
+        }
+        document.getElementById('dataset-cover').src = im.cover_url;
+        document.getElementById('dataset-lsb-cover').src = im.lsb_cover_url;
+        const j = im.jpeg || {};
+        document.getElementById('dataset-jpeg-note').textContent = 'Uji JPEG (Q90): ' + (j.success ? 'pesan masih bisa diekstrak (tidak umum untuk LSB).' : 'pesan tidak bisa diekstrak — hasil yang diharapkan untuk LSB lossy.' + (j.error ? ' (' + j.error + ')' : ''));
+    }
+    sel.addEventListener('change', () => { imgIdx = parseInt(sel.value, 10) || 0; render(); });
+    pills.forEach((b) => b.addEventListener('click', () => { size = b.dataset.size; render(); }));
+    render();
+})();
+function previewDatasetFiles(input){
+    const box = document.getElementById('dataset-filelist');
+    const files = Array.from(input.files || []);
+    if (!files.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    box.classList.remove('hidden');
+    box.innerHTML = files.map((f) => '<div>• ' + f.name + ' (' + Math.round(f.size/1024) + ' KB)</div>').join('');
+}
 
 document.querySelectorAll('[data-loading-form]').forEach((form) => {
     form.addEventListener('submit', () => {

@@ -6,3 +6,4 @@ pycryptodome
 pytest
 flask
 gunicorn
+openpyxl
