@@ -1,6 +1,9 @@
 import os
+import base64
 import hashlib
 import io
+import shutil
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -9,7 +12,15 @@ from PIL import Image
 
 import numpy as np
 
-from src.analysis import calculate_mse, calculate_psnr
+from src.analysis import (
+    calculate_mse,
+    calculate_psnr,
+    extract_lsb_plane,
+    figure_to_base64,
+    lsb_plane_to_image,
+    plot_histogram,
+    test_jpeg_robustness,
+)
 from src.prng import derive_prng_seed, generate_positions
 from src.steganography import (
     FULL_OVERHEAD,
@@ -36,6 +47,38 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 def draft_derive_prng_seed(password: str) -> bytes:
     # wrapper for backwards compat — delegate ke src.prng.derive_prng_seed
     return derive_prng_seed(password)
+
+
+def _extract_message_from_image(image: Image.Image, password: str) -> str:
+    """Extract + decrypt hidden message (dipakai ulang route /analysis/jpeg).
+
+    Logika identik dengan route /decode: baca header pakai
+    generate_positions sebanyak HEADER_SIZE*8, parse panjang payload,
+    generate posisi lengkap, extract_payload, decrypt_message.
+    """
+    if image.mode not in {"RGB", "RGBA"}:
+        image = image.convert("RGB")
+
+    width, height = image.size
+    total_slots = width * height * 3
+    seed = draft_derive_prng_seed(password)
+    header_bits_needed = HEADER_SIZE * 8
+    if total_slots < header_bits_needed:
+        raise InvalidPayloadError("Gambar terlalu kecil untuk berisi payload.")
+    # prefix-consistent: generate_positions(total, 64, seed)
+    # == generate_positions(total, needed, seed)[:64]
+    header_positions = generate_positions(total_slots, header_bits_needed, seed)
+    normalized = normalize_image(image)
+    flat = np.array(normalized)[:, :, :3].reshape(-1)
+    header_bits = [int(flat[p]) & 1 for p in header_positions]
+    payload_length = parse_header(bits_to_bytes(header_bits))
+    needed = (HEADER_SIZE + payload_length) * 8
+    if needed > total_slots:
+        raise InvalidPayloadError("Password salah atau data telah dimodifikasi.")
+    positions = generate_positions(total_slots, needed, seed)
+    payload = extract_payload(image, positions)
+    plaintext = decrypt_message(payload, password)
+    return plaintext.decode("utf-8")
 
 
 @app.route("/")
@@ -210,6 +253,162 @@ def decode_post():
     except Exception as e:
         flash(f"Decoding gagal: {e}", "error")
         return redirect(url_for("encode_page") + "#decode")
+
+
+@app.route("/analysis")
+def analysis_page():
+    return render_template("analysis.html")
+
+
+@app.post("/analysis/histogram")
+def analysis_histogram_post():
+    cover_file = request.files.get("cover")
+    stego_file = request.files.get("stego")
+
+    if (
+        not cover_file
+        or cover_file.filename == ""
+        or not stego_file
+        or stego_file.filename == ""
+    ):
+        flash("Silakan upload cover image dan stego image.", "error")
+        return redirect(url_for("analysis_page"))
+
+    try:
+        cover = Image.open(cover_file.stream)
+        stego = Image.open(stego_file.stream)
+        if cover.mode not in {"RGB", "RGBA"}:
+            cover = cover.convert("RGB")
+        if stego.mode not in {"RGB", "RGBA"}:
+            stego = stego.convert("RGB")
+
+        fig = plot_histogram(cover, stego)
+        histogram_b64 = "data:image/png;base64," + figure_to_base64(fig)
+        mse_value = calculate_mse(cover, stego)
+        psnr_value = calculate_psnr(cover, stego)
+        if psnr_value == float("inf"):
+            psnr_display = "∞ (gambar identik)"
+        else:
+            psnr_display = f"{psnr_value:.2f} dB"
+
+        return render_template(
+            "analysis.html",
+            active_tab="histogram",
+            histogram_b64=histogram_b64,
+            hist_mse=f"{mse_value:.6f}",
+            hist_psnr=psnr_display,
+        )
+
+    except Exception as e:
+        flash(f"Histogram gagal: {e}", "error")
+        return redirect(url_for("analysis_page"))
+
+
+@app.post("/analysis/lsb")
+def analysis_lsb_post():
+    image_file = request.files.get("image")
+
+    if not image_file or image_file.filename == "":
+        flash("Silakan upload gambar.", "error")
+        return redirect(url_for("analysis_page"))
+
+    try:
+        image = Image.open(image_file.stream)
+        if image.mode not in {"RGB", "RGBA"}:
+            image = image.convert("RGB")
+
+        plane = extract_lsb_plane(image)
+        lsb_image = lsb_plane_to_image(plane)
+
+        lsb_buf = io.BytesIO()
+        lsb_image.save(lsb_buf, format="PNG")
+        lsb_b64 = "data:image/png;base64," + base64.b64encode(
+            lsb_buf.getvalue()
+        ).decode("ascii")
+
+        orig_buf = io.BytesIO()
+        image.save(orig_buf, format="PNG")
+        lsb_orig_b64 = "data:image/png;base64," + base64.b64encode(
+            orig_buf.getvalue()
+        ).decode("ascii")
+
+        return render_template(
+            "analysis.html",
+            active_tab="lsb",
+            lsb_b64=lsb_b64,
+            lsb_orig_b64=lsb_orig_b64,
+        )
+
+    except Exception as e:
+        flash(f"Steganalisis LSB gagal: {e}", "error")
+        return redirect(url_for("analysis_page"))
+
+
+@app.post("/analysis/jpeg")
+def analysis_jpeg_post():
+    stego_file = request.files.get("stego")
+    password = request.form.get("password", "").strip()
+    quality_raw = request.form.get("quality", "90")
+    try:
+        quality = int(quality_raw)
+    except (TypeError, ValueError):
+        quality = 90
+    if quality not in (90, 70, 50):
+        quality = 90
+
+    if not stego_file or stego_file.filename == "":
+        flash("Silakan upload stego image.", "error")
+        return redirect(url_for("analysis_page"))
+
+    if not password:
+        flash("Silakan masukkan password.", "error")
+        return redirect(url_for("analysis_page"))
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp_path = tmp.name
+        stego_file.save(tmp_path)
+
+        def extract_fn(jpeg_path: str) -> str:
+            with Image.open(jpeg_path) as jpg:
+                jpg.load()
+                return _extract_message_from_image(jpg, password)
+
+        result = test_jpeg_robustness(tmp_path, extract_fn, quality)
+
+        stego_id = uuid.uuid4().hex[:8]
+        with Image.open(tmp_path) as orig:
+            if orig.mode not in {"RGB", "RGBA"}:
+                orig = orig.convert("RGB")
+            orig_path = UPLOAD_DIR / f"{stego_id}_analysis_orig.png"
+            orig.save(orig_path, format="PNG")
+        jpeg_stego_url = url_for("static", filename=f"uploads/{orig_path.name}")
+
+        jpeg_url = None
+        internal_jpeg = result.get("jpeg_path") or ""
+        if internal_jpeg and os.path.isfile(internal_jpeg):
+            jpeg_path = UPLOAD_DIR / f"{stego_id}_converted_q{quality}.jpg"
+            shutil.copy(internal_jpeg, jpeg_path)
+            os.unlink(internal_jpeg)
+            jpeg_url = url_for("static", filename=f"uploads/{jpeg_path.name}")
+
+        return render_template(
+            "analysis.html",
+            active_tab="jpeg",
+            jpeg_success=bool(result.get("success")),
+            jpeg_error=result.get("error"),
+            jpeg_quality=quality,
+            jpeg_url=jpeg_url,
+            jpeg_stego_url=jpeg_stego_url,
+        )
+
+    except Exception as e:
+        flash(f"Uji JPEG gagal: {e}", "error")
+        return redirect(url_for("analysis_page"))
+    finally:
+        if tmp_path and os.path.isfile(tmp_path):
+            os.unlink(tmp_path)
 
 
 if __name__ == "__main__":

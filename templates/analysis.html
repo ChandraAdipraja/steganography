@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Analysis - StegoCrypt{% endblock %}
+{% block content %}
+
+<section class="max-w-[1120px] mx-auto px-5 lg:px-6 pt-10 pb-6">
+    <div class="max-w-[640px]">
+        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500">StegoCrypt Tool</p>
+        <h1 class="mt-2 text-[32px] font-extrabold tracking-tight leading-none">Analysis</h1>
+        <p class="mt-2 text-sm leading-6 text-zinc-500">Bandingkan cover dan stego secara statistik dan visual, lalu uji ketahanan pesan terhadap kompresi JPEG.</p>
+    </div>
+
+    <div class="mt-8 border-b border-zinc-200" role="tablist" aria-label="Mode analisis">
+        <div class="flex gap-6">
+            <button id="tab-histogram" role="tab" aria-selected="true" aria-controls="panel-histogram" class="pb-3 border-b-2 border-zinc-900 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Histogram</button>
+            <button id="tab-lsb" role="tab" aria-selected="false" aria-controls="panel-lsb" tabindex="-1" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Steganalisis Visual (LSB)</button>
+            <button id="tab-jpeg" role="tab" aria-selected="false" aria-controls="panel-jpeg" tabindex="-1" class="pb-3 border-b-2 border-transparent text-sm font-medium text-zinc-500 hover:text-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm">Uji Kerapuhan JPEG</button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mt-6 space-y-2" role="status" aria-live="polite">
+          {% for cat, msg in messages %}
+            <div class="px-4 py-3 rounded-xl text-sm {% if cat=='success' %}bg-green-50 border border-green-200 text-green-800{% elif cat=='error' %}bg-red-50 border border-red-200 text-red-800{% else %}bg-zinc-50 border border-zinc-200 text-zinc-700{% endif %}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Histogram panel -->
+    <div id="panel-histogram" role="tabpanel" aria-labelledby="tab-histogram" class="mt-6">
+        <form method="POST" action="{{ url_for('analysis_histogram_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">1</span>
+                    <div>
+                        <label for="hist-cover-input" class="font-semibold text-sm">Cover image</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Gambar asli sebelum disisipi pesan.</p>
+                    </div>
+                </div>
+                <label for="hist-cover-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload cover image</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <input id="hist-cover-input" type="file" name="cover" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'hist-cover-preview')">
+                </label>
+                <img id="hist-cover-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau cover image">
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">2</span>
+                    <div>
+                        <label for="hist-stego-input" class="font-semibold text-sm">Stego image</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Gambar yang sudah disisipi pesan, ukuran sama dengan cover.</p>
+                    </div>
+                </div>
+                <label for="hist-stego-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload stego image</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <input id="hist-stego-input" type="file" name="stego" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'hist-stego-preview')">
+                </label>
+                <img id="hist-stego-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau stego image">
+            </div>
+
+            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Bandingkan Histogram</button>
+        </form>
+
+        {% if histogram_b64 is defined %}
+        <div id="histogram-result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6">
+            <div class="font-semibold text-sm">Hasil perbandingan</div>
+            <img src="{{ histogram_b64 }}" class="mt-4 w-full rounded-xl border border-zinc-200" alt="Grafik histogram cover vs stego per channel RGB">
+            <dl class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
+                <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">MSE</dt><dd class="text-sm font-semibold tabular-nums">{{ hist_mse }}</dd></div>
+                <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">PSNR</dt><dd class="text-sm font-semibold tabular-nums">{{ hist_psnr }}</dd></div>
+            </dl>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- LSB panel -->
+    <div id="panel-lsb" role="tabpanel" aria-labelledby="tab-lsb" class="hidden mt-6">
+        <form method="POST" action="{{ url_for('analysis_lsb_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">1</span>
+                    <div>
+                        <label for="lsb-input" class="font-semibold text-sm">Gambar</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Bit LSB tiap channel divisualkan agar pola sisipan terlihat.</p>
+                    </div>
+                </div>
+                <label for="lsb-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload gambar</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <input id="lsb-input" type="file" name="image" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'lsb-preview')">
+                </label>
+                <img id="lsb-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau gambar">
+            </div>
+
+            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Tampilkan Bidang LSB</button>
+        </form>
+
+        {% if lsb_b64 is defined %}
+        <div id="lsb-result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6">
+            <div class="font-semibold text-sm">Bidang LSB</div>
+            <p class="text-xs text-zinc-500 mt-0.5">Kiri gambar asli, kanan visualisasi bit LSB-nya.</p>
+            <div class="mt-4 grid sm:grid-cols-2 gap-4">
+                <figure>
+                    <img src="{{ lsb_orig_b64 }}" class="w-full rounded-xl border border-zinc-200" alt="Gambar asli">
+                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Asli</figcaption>
+                </figure>
+                <figure>
+                    <img src="{{ lsb_b64 }}" class="w-full rounded-xl border border-zinc-200" alt="Visualisasi bidang LSB">
+                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Bidang LSB</figcaption>
+                </figure>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- JPEG panel -->
+    <div id="panel-jpeg" role="tabpanel" aria-labelledby="tab-jpeg" class="hidden mt-6">
+        <form method="POST" action="{{ url_for('analysis_jpeg_post') }}" enctype="multipart/form-data" class="space-y-4" data-loading-form>
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">1</span>
+                    <div>
+                        <label for="jpeg-input" class="font-semibold text-sm">Stego image</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Gambar akan dikonversi ke JPEG lalu dicoba diekstrak.</p>
+                    </div>
+                </div>
+                <label for="jpeg-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                    <span class="text-sm font-medium">Upload stego image</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <input id="jpeg-input" type="file" name="stego" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'jpeg-preview')">
+                </label>
+                <img id="jpeg-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau stego image">
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">2</span>
+                    <div>
+                        <label for="jpeg-password" class="font-semibold text-sm">Password</label>
+                        <p class="text-xs text-zinc-500 mt-0.5">Password yang dipakai saat encoding.</p>
+                    </div>
+                </div>
+                <input id="jpeg-password" type="password" name="password" placeholder="Masukkan password" autocomplete="current-password" class="mt-4 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400">
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">3</span>
+                    <div>
+                        <div class="font-semibold text-sm" id="jpeg-quality-label">Kualitas JPEG</div>
+                        <p class="text-xs text-zinc-500 mt-0.5">Semakin rendah, kompresi semakin agresif.</p>
+                    </div>
+                </div>
+                <div class="mt-4 flex gap-3" role="radiogroup" aria-labelledby="jpeg-quality-label">
+                    <label class="flex-1 rounded-xl border border-zinc-200 px-4 py-3 text-sm text-center cursor-pointer has-checked:border-zinc-900 has-checked:bg-zinc-50 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                        <input type="radio" name="quality" value="90" class="accent-zinc-900" {% if jpeg_quality is not defined or jpeg_quality == 90 %}checked{% endif %}> 90
+                    </label>
+                    <label class="flex-1 rounded-xl border border-zinc-200 px-4 py-3 text-sm text-center cursor-pointer has-checked:border-zinc-900 has-checked:bg-zinc-50 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                        <input type="radio" name="quality" value="70" class="accent-zinc-900" {% if jpeg_quality is defined and jpeg_quality == 70 %}checked{% endif %}> 70
+                    </label>
+                    <label class="flex-1 rounded-xl border border-zinc-200 px-4 py-3 text-sm text-center cursor-pointer has-checked:border-zinc-900 has-checked:bg-zinc-50 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                        <input type="radio" name="quality" value="50" class="accent-zinc-900" {% if jpeg_quality is defined and jpeg_quality == 50 %}checked{% endif %}> 50
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Uji Kerapuhan JPEG</button>
+        </form>
+
+        {% if jpeg_success is defined %}
+        <div id="jpeg-result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6">
+            <div class="font-semibold text-sm">Hasil uji kerapuhan (kualitas {{ jpeg_quality }})</div>
+            {% if jpeg_success %}
+            <div class="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3" role="status">Pesan masih bisa diekstrak setelah konversi JPEG. Ini tidak umum untuk LSB — periksa kembali logika pengujiannya.</div>
+            {% else %}
+            <div class="mt-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3" role="status">Pesan tidak bisa diekstrak setelah konversi JPEG{% if jpeg_error %}: {{ jpeg_error }}{% endif %}. Ini hasil yang diharapkan secara teori — LSB rapuh terhadap kompresi lossy JPEG, bukan bug.</div>
+            {% endif %}
+            {% if jpeg_stego_url is defined and jpeg_url is defined and jpeg_url %}
+            <div class="mt-4 grid sm:grid-cols-2 gap-4">
+                <figure>
+                    <img src="{{ jpeg_stego_url }}" class="w-full rounded-xl border border-zinc-200" alt="Stego PNG asli">
+                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Stego PNG</figcaption>
+                </figure>
+                <figure>
+                    <img src="{{ jpeg_url }}" class="w-full rounded-xl border border-zinc-200" alt="Hasil konversi JPEG">
+                    <figcaption class="mt-2 text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">JPEG hasil konversi</figcaption>
+                </figure>
+            </div>
+            <a href="{{ jpeg_url }}" download="stego_converted.jpg" class="mt-4 inline-flex w-full justify-center rounded-full border border-zinc-900 bg-white text-zinc-900 py-3 text-sm font-semibold hover:bg-zinc-50 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">Download JPEG Hasil Konversi</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const tabs = ['histogram', 'lsb', 'jpeg'];
+function setTab(mode){
+    if (!tabs.includes(mode)) mode = 'histogram';
+    tabs.forEach((t) => {
+        const tab = document.getElementById('tab-' + t);
+        const panel = document.getElementById('panel-' + t);
+        const active = t === mode;
+        tab.setAttribute('aria-selected', String(active));
+        tab.tabIndex = active ? 0 : -1;
+        tab.className = 'pb-3 border-b-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-900 focus-visible:rounded-sm ' + (active ? 'border-zinc-900 font-semibold' : 'border-transparent font-medium text-zinc-500 hover:text-zinc-700');
+        panel.classList.toggle('hidden', !active);
+    });
+}
+tabs.forEach((t) => {
+    document.getElementById('tab-' + t)?.addEventListener('click', () => setTab(t));
+});
+document.querySelector('[role="tablist"]')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const current = tabs.findIndex((t) => document.getElementById('tab-' + t).getAttribute('aria-selected') === 'true');
+    const next = (current + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+    setTab(tabs[next]);
+    document.getElementById('tab-' + tabs[next]).focus();
+});
+setTab('{{ active_tab | default("histogram", true) }}');
+{% if histogram_b64 is defined %}document.getElementById('histogram-result')?.scrollIntoView({block:'start'});{% endif %}
+{% if lsb_b64 is defined %}document.getElementById('lsb-result')?.scrollIntoView({block:'start'});{% endif %}
+{% if jpeg_success is defined %}document.getElementById('jpeg-result')?.scrollIntoView({block:'start'});{% endif %}
+
+document.querySelectorAll('[data-loading-form]').forEach((form) => {
+    form.addEventListener('submit', () => {
+        const btn = form.querySelector('[data-submit-btn]');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        btn.dataset.label = btn.textContent;
+        btn.textContent = 'Memproses...';
+    });
+});
+
+function previewFile(input, imgId){
+    const file = input.files[0];
+    if(!file) return;
+    const img = document.getElementById(imgId);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        img.src = e.target.result;
+        img.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+}
+</script>
+{% endblock %}
