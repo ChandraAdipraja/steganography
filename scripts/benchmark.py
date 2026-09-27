@@ -29,6 +29,7 @@ from src.analysis import (
 from src.crypto import decrypt_message, encrypt_message
 from src.prng import derive_prng_seed, generate_positions
 from src.report import build_xlsx, channel_maxdiff
+from src.roundtrip import run_codec_case
 from src.steganography import (
     calculate_capacity,
     embed_payload,
@@ -147,6 +148,7 @@ def main():
         )
     (RESULTS_DIR / "benchmark_5x3.md").write_text("\n".join(md_lines) + "\n")
     per_cover = build_per_cover_outputs(medium_by_cover)
+    roundtrip = build_roundtrip_cases(rows, medium_by_cover)
     xlsx_path = RESULTS_DIR / "benchmark.xlsx"
     build_xlsx(
         rows, per_cover, xlsx_path,
@@ -154,9 +156,55 @@ def main():
         message_desc="16 / 256 / 1024 byte plaintext (sintetis deterministik)",
         password_desc="benchmark-key-123 (dummy, reproduksibilitas)",
         jpeg_quality=JPEG_QUALITY,
+        roundtrip=roundtrip,
     )
     print(f"wrote {len(rows)} rows to {csv_path}")
     print(f"wrote workbook to {xlsx_path}")
+
+
+def build_roundtrip_cases(rows, medium_by_cover):
+    """20 baris sheet Encode_Decode: 15 Benar (pakai ulang hasil run)
+    + 5 Salah (decode stego medium dengan password salah, tanpa re-embed)."""
+    cases = []
+    for row in rows:
+        if row["extraction_ok"]:
+            cases.append({
+                "image": row["image"],
+                "message_size": row["message_size"],
+                "key_status": "Benar",
+                "fail_stage": "selesai",
+                "success": True,
+                "error": "-",
+                "recovered": "Yes",
+            })
+        else:
+            # jarang terjadi — jalankan staged helper untuk tahu tahap persisnya
+            cover_path = next(
+                p for p in medium_by_cover
+                if p.name == row["image"]
+            )
+            cover = Image.open(cover_path)
+            size = row["message_size"]
+            detail = run_codec_case(
+                cover, make_plaintext(size), PASSWORD, PASSWORD, "Benar"
+            )
+            cases.append({"image": row["image"], "message_size": size, **detail})
+    for cover_path, (plaintext, result) in sorted(
+        medium_by_cover.items(), key=lambda kv: kv[0].name
+    ):
+        detail = run_codec_case(
+            result["cover"], plaintext,
+            PASSWORD, PASSWORD + "-salah", "Salah",
+            stego=result["stego"],
+        )
+        cases.append({
+            "image": cover_path.name,
+            "message_size": len(plaintext),
+            **detail,
+        })
+        print(f"{cover_path.name} kunci-salah: {detail['fail_stage']} "
+              f"success={detail['success']}")
+    return cases
 
 
 def build_per_cover_outputs(medium_by_cover):
