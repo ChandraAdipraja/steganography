@@ -104,6 +104,11 @@ def _extract_message_from_image(image: Image.Image, password: str) -> str:
     flat = np.array(normalized)[:, :, :3].reshape(-1)
     header_bits = [int(flat[p]) & 1 for p in header_positions]
     payload_length = parse_header(bits_to_bytes(header_bits))
+    # Fail-fast: blob valid minimal 44 byte (salt+nonce+tag crypto).
+    # Panjang di bawah itu pasti sampah (mis. header rusak akibat JPEG)
+    # — tolak sebelum generate jutaan posisi permutasi yang lambat.
+    if payload_length < CRYPTO_OVERHEAD_BYTES:
+        raise InvalidPayloadError("Password salah atau data telah dimodifikasi.")
     needed = (HEADER_SIZE + payload_length) * 8
     if needed > total_slots:
         raise InvalidPayloadError("Password salah atau data telah dimodifikasi.")
@@ -458,10 +463,8 @@ def analysis_dataset_post():
                 needed = (HEADER_SIZE + len(blob)) * 8
                 positions = generate_positions(total_slots, needed, seed)
                 stego = embed_payload(cover, blob, positions)
-                # roundtrip check
-                raw = extract_payload(
-                    stego, generate_positions(total_slots, needed, seed)
-                )
+                # roundtrip check — pakai positions yang sama, jangan generate ulang
+                raw = extract_payload(stego, positions)
                 ok = decrypt_message(raw, password) == plain
 
                 stego_file = f"stego_{stem}_{label}.png"
