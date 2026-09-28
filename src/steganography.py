@@ -13,13 +13,27 @@ MAGIC = b"STG1"
 HEADER_FORMAT = ">4sI"
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
-# Full overhead per AGENTS.md §12: stego header + crypto blob (salt+nonce+tag)
-# Import dari src.crypto — jangan hardcode 44, source of truth adalah CRYPTO_OVERHEAD_BYTES
 from src.crypto import CRYPTO_OVERHEAD_BYTES  # noqa: E402
 
 FULL_OVERHEAD = HEADER_SIZE + CRYPTO_OVERHEAD_BYTES
 
 BITS_PER_CHANNEL = 1
+MIN_BITS_PER_CHANNEL = 1
+MAX_BITS_PER_CHANNEL = 8  # batas fisik channel 8-bit (UI produk membatasi 1..3)
+
+
+def _check_bits_per_channel(bits_per_channel: int) -> int:
+    if (
+        isinstance(bits_per_channel, bool)
+        or not isinstance(bits_per_channel, int)
+    ):
+        raise ValueError("bits_per_channel must be an int")
+    if not MIN_BITS_PER_CHANNEL <= bits_per_channel <= MAX_BITS_PER_CHANNEL:
+        raise ValueError(
+            f"bits_per_channel must be between {MIN_BITS_PER_CHANNEL} "
+            f"and {MAX_BITS_PER_CHANNEL}"
+        )
+    return bits_per_channel
 
 
 class SteganographyError(Exception):
@@ -74,15 +88,11 @@ def get_used_channels(image: Image.Image) -> int:
     )
 
 
-def calculate_capacity(image: Image.Image) -> int:
-    """
-    Kapasitas maksimum plaintext (byte) yang boleh diketik user.
-
-    Opsi A (AGENTS.md §12): budget plaintext = total slot / 8 - FULL_OVERHEAD,
-    dengan FULL_OVERHEAD = HEADER_SIZE (8, format STG1) + CRYPTO_OVERHEAD_BYTES (44, salt+nonce+tag).
-    Bukan budget blob — cek di app.py harus dilakukan pada panjang plaintext,
-    atau setelah enkripsi bandingkan blob vs (capacity + CRYPTO_OVERHEAD_BYTES).
-    """
+def calculate_capacity(
+    image: Image.Image,
+    bits_per_channel: int = BITS_PER_CHANNEL,
+) -> int:
+    m = _check_bits_per_channel(bits_per_channel)
     image = normalize_image(image)
     channels = get_used_channels(image)
 
@@ -92,7 +102,7 @@ def calculate_capacity(image: Image.Image) -> int:
         width
         * height
         * channels
-        * BITS_PER_CHANNEL
+        * m
     )
 
     capacity_bytes = capacity_bits // 8
@@ -182,21 +192,46 @@ def prepare_payload(payload: bytes) -> bytes:
     return header + payload
 
 
+def _bits_to_chunks(bits: list[int], m: int) -> list[int]:
+    """Kelompokkan aliran bit menjadi chunk m-bit (MSB-first), padding nol."""
+    padded = bits + [0] * ((-len(bits)) % m)
+    chunks = []
+    for index in range(0, len(padded), m):
+        value = 0
+        for bit in padded[index:index + m]:
+            value = (value << 1) | bit
+        chunks.append(value)
+    return chunks
+
+
+def _chunks_to_bits(chunks: Sequence[int], m: int) -> list[int]:
+    """Uraikan chunk m-bit kembali menjadi aliran bit (MSB-first)."""
+    bits: list[int] = []
+    for value in chunks:
+        for shift in range(m - 1, -1, -1):
+            bits.append((value >> shift) & 1)
+    return bits
+
+
 def embed_payload(
     image: Image.Image,
     payload: bytes,
     positions: Sequence[int],
+    bits_per_channel: int = BITS_PER_CHANNEL,
 ) -> Image.Image:
+    m = _check_bits_per_channel(bits_per_channel)
     image = normalize_image(image)
     validate_image(image)
 
     prepared_payload = prepare_payload(payload)
-    payload_bits = bytes_to_bits(prepared_payload)
+    chunks = _bits_to_chunks(bytes_to_bits(prepared_payload), m)
 
-    if len(payload_bits) > len(positions):
+    if len(chunks) > len(positions):
         raise CapacityError(
             "Payload exceeds the provided embedding capacity."
         )
+
+    keep_mask = 0xFF ^ ((1 << m) - 1)
 
     array = np.array(image)
 
@@ -213,15 +248,15 @@ def embed_payload(
 
     flat_rgb = pixel_array.reshape(-1)
 
-    for bit, position in zip(payload_bits, positions):
+    for chunk, position in zip(chunks, positions):
         if position < 0 or position >= len(flat_rgb):
             raise InvalidPayloadError(
                 f"Invalid embedding position: {position}"
             )
 
         flat_rgb[position] = (
-            flat_rgb[position] & 0b11111110
-        ) | bit
+            int(flat_rgb[position]) & keep_mask
+        ) | chunk
 
     if image.mode == "RGB":
         result_array = flat_rgb.reshape(array.shape)
@@ -250,7 +285,9 @@ def embed_payload(
 def extract_payload(
     image: Image.Image,
     positions: Sequence[int],
+    bits_per_channel: int = BITS_PER_CHANNEL,
 ) -> bytes:
+    m = _check_bits_per_channel(bits_per_channel)
     image = normalize_image(image)
     validate_image(image)
 
@@ -268,25 +305,29 @@ def extract_payload(
         )
 
     flat_rgb = pixel_array.reshape(-1)
+    channel_mask = (1 << m) - 1
+
+    def _read_chunks(count: int, offset: int = 0) -> list[int]:
+        chunks = []
+        for position in positions[offset:offset + count]:
+            if position < 0 or position >= len(flat_rgb):
+                raise InvalidPayloadError(
+                    f"Invalid extraction position: {position}"
+                )
+            chunks.append(int(flat_rgb[position]) & channel_mask)
+        return chunks
 
     required_header_bits = HEADER_SIZE * 8
+    header_chunks_needed = -(-required_header_bits // m)
 
-    if len(positions) < required_header_bits:
+    if len(positions) < header_chunks_needed:
         raise CapacityError(
             "Not enough positions to extract the header."
         )
 
-    header_bits = []
-
-    for position in positions[:required_header_bits]:
-        if position < 0 or position >= len(flat_rgb):
-            raise InvalidPayloadError(
-                f"Invalid extraction position: {position}"
-            )
-
-        header_bits.append(
-            int(flat_rgb[position]) & 1
-        )
+    header_bits = _chunks_to_bits(
+        _read_chunks(header_chunks_needed), m
+    )[:required_header_bits]
 
     header = bits_to_bytes(header_bits)
 
@@ -298,24 +339,15 @@ def extract_payload(
         required_header_bits
         + required_payload_bits
     )
+    total_chunks_needed = -(-total_required_bits // m)
 
-    if len(positions) < total_required_bits:
+    if len(positions) < total_chunks_needed:
         raise CapacityError(
             "Image does not contain enough data for the declared payload."
         )
 
-    payload_bits = []
-
-    for position in positions[
-        required_header_bits:total_required_bits
-    ]:
-        if position < 0 or position >= len(flat_rgb):
-            raise InvalidPayloadError(
-                f"Invalid extraction position: {position}"
-            )
-
-        payload_bits.append(
-            int(flat_rgb[position]) & 1
-        )
+    payload_bits = _chunks_to_bits(
+        _read_chunks(total_chunks_needed), m
+    )[required_header_bits:total_required_bits]
 
     return bits_to_bytes(payload_bits)

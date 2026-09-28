@@ -4,7 +4,6 @@
 
 <section class="max-w-[1120px] mx-auto px-5 lg:px-6 pt-10 pb-6">
     <div class="max-w-[640px]">
-        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500">StegoCrypt Tool</p>
         <h1 class="mt-2 text-[32px] font-extrabold tracking-tight leading-none">Encode dan Decode</h1>
         <p class="mt-2 text-sm leading-6 text-zinc-500">Sembunyikan pesan ke dalam gambar atau ekstrak kembali pesan yang telah disisipkan dalam satu alur yang sama.</p>
     </div>
@@ -46,7 +45,7 @@
                     <div class="rounded-xl border border-zinc-200 py-3 px-2"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Height</div><div id="cover-h" class="text-sm font-semibold">{% if cover_h is defined %}{{ cover_h }}px{% else %}-{% endif %}</div></div>
                     <div class="rounded-xl border border-zinc-200 py-3 px-2"><div class="text-[11px] uppercase tracking-wide text-zinc-500">Max plaintext</div><div id="cover-c" class="text-sm font-semibold">{% if cover_budget is defined %}{{ "{:,}".format(cover_budget) }} bytes{% else %}-{% endif %}</div></div>
                 </div>
-                <p id="cover-cap-note" class="mt-2 text-[11px] text-zinc-500 text-center {% if cover_w is not defined %}hidden{% endif %}">Kapasitas dihitung dari w x h x 3 / 8 dikurangi 52 byte (8 header, 44 crypto).</p>
+                <p id="cover-cap-note" class="mt-2 text-[11px] text-zinc-500 text-center {% if cover_w is not defined %}hidden{% endif %}">Kapasitas dihitung dari w x h x 3 x m-bit / 8 dikurangi 52 byte (8 header, 44 crypto).</p>
                 {% if cover_url is defined %}
                 <img id="cover-preview" src="{{ cover_url }}" class="mt-4 w-full rounded-xl border border-zinc-200" alt="Cover image yang digunakan">
                 {% else %}
@@ -68,6 +67,33 @@
             <div class="rounded-2xl border border-zinc-200 bg-white p-6">
                 <div class="flex items-center gap-3">
                     <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">3</span>
+                    <div>
+                        <div class="font-semibold text-sm" id="mbits-label">Varian LSB</div>
+                        <p class="text-xs text-zinc-500 mt-0.5">Makin banyak bit, kapasitas makin besar, kualitas makin turun.</p>
+                    </div>
+                </div>
+                <div class="mt-4 grid grid-cols-3 gap-3" role="radiogroup" aria-labelledby="mbits-label">
+                    <label class="rounded-xl border border-zinc-200 px-3 py-3 text-center cursor-pointer has-checked:border-zinc-900 has-checked:bg-zinc-50 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                        <input type="radio" name="mbits" value="1" class="accent-zinc-900" {% if mbits is not defined or mbits == 1 %}checked{% endif %}>
+                        <span class="block text-sm font-semibold">1-bit</span>
+                        <span class="block text-[11px] text-zinc-500">bawaan · ×1</span>
+                    </label>
+                    <label class="rounded-xl border border-zinc-200 px-3 py-3 text-center cursor-pointer has-checked:border-zinc-900 has-checked:bg-zinc-50 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                        <input type="radio" name="mbits" value="2" class="accent-zinc-900" {% if mbits is defined and mbits == 2 %}checked{% endif %}>
+                        <span class="block text-sm font-semibold">2-bit</span>
+                        <span class="block text-[11px] text-zinc-500">kapasitas ×2</span>
+                    </label>
+                    <label class="rounded-xl border border-zinc-200 px-3 py-3 text-center cursor-pointer has-checked:border-zinc-900 has-checked:bg-zinc-50 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
+                        <input type="radio" name="mbits" value="3" class="accent-zinc-900" {% if mbits is defined and mbits == 3 %}checked{% endif %}>
+                        <span class="block text-sm font-semibold">3-bit</span>
+                        <span class="block text-[11px] text-zinc-500">kapasitas ×3</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-zinc-200 bg-white p-6">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">4</span>
                     <div class="flex-1">
                         <label for="message-input" class="font-semibold text-sm">Secret message</label>
                         <p class="text-xs text-zinc-500 mt-0.5">Pesan dienkripsi sebelum disisipkan.</p>
@@ -84,7 +110,7 @@
         {% if stego_url %}
         <div id="result" style="scroll-margin-top:80px" class="mt-4 rounded-2xl border border-zinc-200 bg-white p-6">
             <div class="flex items-center gap-3">
-                <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">4</span>
+                <span class="w-7 h-7 rounded-full bg-zinc-900 text-white flex items-center justify-center text-[11px] font-bold shrink-0" aria-hidden="true">5</span>
                 <div>
                     <div class="font-semibold text-sm">Result</div>
                     <p class="text-xs text-zinc-500 mt-0.5">Bandingkan cover dan stego. Perbedaan visual dirancang minimal.</p>
@@ -101,7 +127,8 @@
                 </figure>
             </div>
             <a href="{{ stego_url }}" download="stego.png" class="mt-4 inline-flex w-full justify-center rounded-full border border-zinc-900 bg-white text-zinc-900 py-3 text-sm font-semibold hover:bg-zinc-50 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900">Download Stego Image</a>
-            <dl class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+            <dl class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">Varian</dt><dd class="text-sm font-semibold tabular-nums">{{ mbits | default(1, true) }}-bit</dd></div>
                 <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">MSE</dt><dd class="text-sm font-semibold tabular-nums">{{ mse_display }}</dd></div>
                 <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">PSNR</dt><dd class="text-sm font-semibold tabular-nums">{{ psnr_display }}</dd></div>
                 <div class="rounded-xl border border-zinc-200 py-3 px-2"><dt class="text-[11px] uppercase tracking-wide text-zinc-500">Payload size</dt><dd class="text-sm font-semibold tabular-nums">{{ blob_display }}</dd></div>
@@ -211,6 +238,19 @@ document.querySelectorAll('[data-loading-form]').forEach((form) => {
     });
 });
 
+function selectedMbits(){
+    const el = document.querySelector('input[name="mbits"]:checked');
+    const m = el ? parseInt(el.value, 10) : 1;
+    return [1, 2, 3].includes(m) ? m : 1;
+}
+
+function refreshCoverCapacity(w, h){
+    const cap = Math.max(0, Math.floor(w*h*3*selectedMbits()/8) - 52);
+    document.getElementById('cover-w').textContent = w+'px';
+    document.getElementById('cover-h').textContent = h+'px';
+    document.getElementById('cover-c').textContent = (cap>0?cap:0).toLocaleString()+' bytes';
+}
+
 function previewImage(input, imgId, metaId){
     const file = input.files[0];
     if(!file) return;
@@ -221,7 +261,7 @@ function previewImage(input, imgId, metaId){
     const tmp = new Image();
     tmp.onload = ()=>{
         const w = tmp.width, h = tmp.height;
-        const cap = Math.max(0, Math.floor(w*h*3/8) - 52);
+        const cap = Math.max(0, Math.floor(w*h*3*selectedMbits()/8) - 52);
         if (metaId==='cover-meta'){
             document.getElementById('cover-w').textContent = w+'px';
             document.getElementById('cover-h').textContent = h+'px';
@@ -266,5 +306,13 @@ function updateMessageCounter(){
         : 'Pesan akan dienkripsi sebelum disisipkan.';
 }
 document.getElementById('message-input')?.addEventListener('input', updateMessageCounter);
+document.querySelectorAll('input[name="mbits"]').forEach((r) => r.addEventListener('change', () => {
+    const wEl = document.getElementById('cover-w');
+    const hEl = document.getElementById('cover-h');
+    const w = wEl ? parseInt(wEl.textContent.replace(/[^0-9]/g, ''), 10) : NaN;
+    const h = hEl ? parseInt(hEl.textContent.replace(/[^0-9]/g, ''), 10) : NaN;
+    if (!Number.isNaN(w) && !Number.isNaN(h) && w > 0 && h > 0) refreshCoverCapacity(w, h);
+    updateMessageCounter();
+}));
 </script>
 {% endblock %}

@@ -9,6 +9,8 @@ Kontrak rows (list of dict):
 Kontrak roundtrip (list of dict, opsional):
     image, message_size, key_status ("Benar"|"Salah"), fail_stage,
     success (bool), error, recovered ("Yes"|"No")
+Kontrak variants (list of dict, opsional) — sheet Varian_mbit:
+    image, m, message_size, capacity, mse, psnr
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ def build_xlsx(
     jpeg_quality: int,
     capacity_note: str = "budget plaintext (Opsi A, FULL_OVERHEAD=52)",
     roundtrip=None,
+    variants=None,
 ):
     """Tulis workbook ke path file atau file-like object (mis. BytesIO)."""
     try:
@@ -187,5 +190,19 @@ def build_xlsx(
         for col, w in zip("ABCDEFG", [26, 13, 22, 20, 20, 48, 22]):
             ws6.column_dimensions[col].width = w
         style_header(ws6, 7)
+
+    # ---- Sheet 7: Varian_mbit (trade-off kapasitas vs PSNR) ----
+    if variants:
+        ws7 = wb.create_sheet("Varian_mbit")
+        headers7 = ["Citra", "m (bit/channel)", "Pesan (B)", "Kapasitas (B)",
+                    "MSE", "PSNR (dB)"]
+        ws7.append(headers7)
+        for v in variants:
+            ws7.append([v["image"], v["m"], v["message_size"],
+                        v["capacity"], round(v["mse"], 6),
+                        fmt_psnr(v["psnr"])])
+        for col, w in zip("ABCDEF", [26, 16, 11, 13, 12, 12]):
+            ws7.column_dimensions[col].width = w
+        style_header(ws7, 6)
 
     wb.save(dest)
