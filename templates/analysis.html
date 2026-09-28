@@ -39,7 +39,7 @@
                 </div>
                 <label for="hist-cover-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
                     <span class="text-sm font-medium">Upload cover image</span>
-                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP</span>
                     <input id="hist-cover-input" type="file" name="cover" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'hist-cover-preview')">
                 </label>
                 <img id="hist-cover-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau cover image">
@@ -55,7 +55,7 @@
                 </div>
                 <label for="hist-stego-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
                     <span class="text-sm font-medium">Upload stego image</span>
-                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP</span>
                     <input id="hist-stego-input" type="file" name="stego" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'hist-stego-preview')">
                 </label>
                 <img id="hist-stego-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau stego image">
@@ -89,7 +89,7 @@
                 </div>
                 <label for="lsb-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
                     <span class="text-sm font-medium">Upload gambar</span>
-                    <span class="text-xs text-zinc-500">PNG atau BMP, klik untuk memilih file</span>
+                    <span class="text-xs text-zinc-500">PNG atau BMP</span>
                     <input id="lsb-input" type="file" name="image" accept=".png,.bmp" class="visually-hidden" onchange="previewFile(this,'lsb-preview')">
                 </label>
                 <img id="lsb-preview" class="hidden mt-4 w-full rounded-xl border border-zinc-200" alt="Pratinjau gambar">
@@ -129,7 +129,7 @@
                 </div>
                 <label for="dataset-input" class="mt-4 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/50 py-8 cursor-pointer hover:bg-zinc-50 hover:border-zinc-400 transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-900">
                     <span class="text-sm font-medium">Upload dataset (bisa banyak file)</span>
-                    <span class="text-xs text-zinc-500">PNG saja, maks 1024px, klik untuk memilih file</span>
+                    <span class="text-xs text-zinc-500">PNG saja, maks 1024px</span>
                     <input id="dataset-input" type="file" name="dataset" accept=".png" multiple class="visually-hidden" onchange="previewDatasetFiles(this)">
                 </label>
                 <div id="dataset-filelist" class="hidden mt-3 text-xs text-zinc-600 space-y-1"></div>
@@ -143,7 +143,12 @@
                         <p class="text-xs text-zinc-500 mt-0.5">Satu password dipakai untuk semua citra.</p>
                     </div>
                 </div>
-                <input id="dataset-password" type="password" name="password" placeholder="Masukkan password" autocomplete="new-password" class="mt-4 w-full rounded-xl border border-zinc-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400">
+                <div class="relative mt-4">
+                    <input id="dataset-password" type="password" name="password" placeholder="Masukkan password" autocomplete="new-password" class="w-full rounded-xl border border-zinc-200 pl-4 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400">
+                    <button type="button" data-toggle-password="dataset-password" aria-label="Tampilkan password" aria-pressed="false" class="absolute inset-y-0 right-0 flex items-center pr-4 text-zinc-400 hover:text-zinc-700 focus-visible:outline-2 focus-visible:outline-zinc-900 focus-visible:rounded">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
             </div>
 
             <button type="submit" data-submit-btn class="w-full rounded-full bg-zinc-900 text-white py-3.5 text-sm font-semibold hover:bg-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed">Generate Pengujian Dataset</button>
@@ -213,7 +218,6 @@
                 </div>
             </div>
 
-            <p id="dataset-jpeg-note" class="text-xs text-zinc-500"></p>
         </div>
         <script id="dataset-data" type="application/json">{{ dataset_json | safe }}</script>
         {% endif %}
@@ -297,8 +301,6 @@ setTab('{{ active_tab | default("histogram", true) }}');
         }
         document.getElementById('dataset-cover').src = im.cover_url;
         document.getElementById('dataset-lsb-cover').src = im.lsb_cover_url;
-        const j = im.jpeg || {};
-        document.getElementById('dataset-jpeg-note').textContent = 'Uji JPEG (Q90): ' + (j.success ? 'pesan masih bisa diekstrak (tidak umum untuk LSB).' : 'pesan tidak bisa diekstrak — hasil yang diharapkan untuk LSB lossy.' + (j.error ? ' (' + j.error + ')' : ''));
     }
     sel.addEventListener('change', () => { imgIdx = parseInt(sel.value, 10) || 0; render(); });
     pills.forEach((b) => b.addEventListener('click', () => { size = b.dataset.size; render(); }));
@@ -334,5 +336,16 @@ function previewFile(input, imgId){
     };
     reader.readAsDataURL(file);
 }
+
+document.querySelectorAll('[data-toggle-password]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.togglePassword);
+        if (!input) return;
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.setAttribute('aria-pressed', String(show));
+        btn.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
+    });
+});
 </script>
 {% endblock %}
