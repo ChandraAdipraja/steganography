@@ -4,7 +4,6 @@
 
 <section class="max-w-[1120px] mx-auto px-5 lg:px-6 pt-10 pb-6">
     <div class="max-w-[640px]">
-        <p class="text-[11px] font-semibold tracking-[0.14em] uppercase text-zinc-500">StegoCrypt Tool</p>
         <h1 class="mt-2 text-[32px] font-extrabold tracking-tight leading-none">Analysis</h1>
         <p class="mt-2 text-sm leading-6 text-zinc-500">Bandingkan cover dan stego secara statistik dan visual, atau uji sekumpulan citra sekaligus lewat tab Uji Dataset.</p>
     </div>
@@ -176,6 +175,15 @@
                 </div>
             </div>
 
+            <div>
+                <span class="text-[11px] font-semibold tracking-[0.08em] uppercase text-zinc-500">Varian LSB</span>
+                <div id="dataset-mpills" class="mt-1 flex gap-2" role="group" aria-label="Varian m-bit">
+                    <button type="button" data-m="1" class="flex-1 rounded-xl border px-3 py-2.5 text-sm">1-bit</button>
+                    <button type="button" data-m="2" class="flex-1 rounded-xl border px-3 py-2.5 text-sm">2-bit</button>
+                    <button type="button" data-m="3" class="flex-1 rounded-xl border px-3 py-2.5 text-sm">3-bit</button>
+                </div>
+            </div>
+
             <dl id="dataset-metrics" class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center"></dl>
 
             <div>
@@ -251,7 +259,12 @@ setTab('{{ active_tab | default("histogram", true) }}');
     try { batch = JSON.parse(dataEl.textContent); } catch(e) { return; }
     const sel = document.getElementById('dataset-select');
     const pills = Array.from(document.querySelectorAll('#dataset-pills button'));
-    let imgIdx = 0, size = 'medium';
+    const mpills = Array.from(document.querySelectorAll('#dataset-mpills button'));
+    let imgIdx = 0, size = 'medium', mbits = '1';
+    function payloadFor(im){
+        if (mbits === '1' || !im.variants || !im.variants[mbits]) return im.payloads[size];
+        return im.variants[mbits][size];
+    }
     batch.images.forEach((im, i) => {
         const opt = document.createElement('option');
         opt.value = String(i);
@@ -263,14 +276,18 @@ setTab('{{ active_tab | default("histogram", true) }}');
     }
     function render(){
         const im = batch.images[imgIdx];
-        const p = im.payloads[size];
+        const p = payloadFor(im);
         pills.forEach((b) => {
             const on = b.dataset.size === size;
             b.className = 'flex-1 rounded-xl border px-3 py-2.5 text-sm transition ' + (on ? 'border-zinc-900 bg-zinc-900 text-white font-semibold' : 'border-zinc-200 hover:bg-zinc-50');
         });
+        mpills.forEach((b) => {
+            const on = b.dataset.m === mbits;
+            b.className = 'flex-1 rounded-xl border px-3 py-2.5 text-sm transition ' + (on ? 'border-zinc-900 bg-zinc-900 text-white font-semibold' : 'border-zinc-200 hover:bg-zinc-50');
+        });
         const metrics = document.getElementById('dataset-metrics');
         if (!p || p.skipped) {
-            metrics.innerHTML = metricCell('Status', 'Payload ' + size + ' dilewati (melebihi kapasitas)');
+            metrics.innerHTML = metricCell('Status', 'Payload ' + size + ' varian ' + mbits + '-bit dilewati (melebihi kapasitas)');
             ['dataset-hist','dataset-cover','dataset-stego','dataset-lsb-cover','dataset-lsb-stego'].forEach((id) => { document.getElementById(id)?.removeAttribute('src'); });
         } else {
             metrics.innerHTML = metricCell('MSE', p.mse) + metricCell('PSNR', p.psnr + (p.psnr === 'inf' ? '' : ' dB')) + metricCell('Ekstraksi', p.ok ? 'OK' : 'Gagal') + metricCell('Histogram', im.hist_verdict || '-');
@@ -285,6 +302,7 @@ setTab('{{ active_tab | default("histogram", true) }}');
     }
     sel.addEventListener('change', () => { imgIdx = parseInt(sel.value, 10) || 0; render(); });
     pills.forEach((b) => b.addEventListener('click', () => { size = b.dataset.size; render(); }));
+    mpills.forEach((b) => b.addEventListener('click', () => { mbits = b.dataset.m; render(); }));
     render();
 })();
 function previewDatasetFiles(input){

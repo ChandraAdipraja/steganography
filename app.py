@@ -82,12 +82,24 @@ def draft_derive_prng_seed(password: str) -> bytes:
     return derive_prng_seed(password)
 
 
-def _extract_message_from_image(image: Image.Image, password: str) -> str:
-    """Extract + decrypt hidden message (dipakai ulang route /analysis/jpeg).
+MBITS_CHOICES = (1, 2, 3)
 
-    Logika identik dengan route /decode: baca header pakai
-    generate_positions sebanyak HEADER_SIZE*8, parse panjang payload,
-    generate posisi lengkap, extract_payload, decrypt_message.
+
+def _parse_mbits(raw) -> int:
+    try:
+        m = int(raw)
+    except (TypeError, ValueError):
+        return 1
+    return m if m in MBITS_CHOICES else 1
+
+
+def _extract_message_from_image(
+    image: Image.Image, password: str
+) -> tuple[str, int]:
+    """Extract + decrypt hidden message, varian m-bit terdeteksi otomatis.
+
+    Mencoba m = 1 → 2 → 3: hanya m yang benar menghasilkan header STG1
+    yang valid. Mengembalikan (pesan, m_terdeteksi).
     """
     if image.mode not in {"RGB", "RGBA"}:
         image = image.convert("RGB")
@@ -98,25 +110,45 @@ def _extract_message_from_image(image: Image.Image, password: str) -> str:
     header_bits_needed = HEADER_SIZE * 8
     if total_slots < header_bits_needed:
         raise InvalidPayloadError("Gambar terlalu kecil untuk berisi payload.")
-    # prefix-consistent: generate_positions(total, 64, seed)
-    # == generate_positions(total, needed, seed)[:64]
-    header_positions = generate_positions(total_slots, header_bits_needed, seed)
     normalized = normalize_image(image)
     flat = np.array(normalized)[:, :, :3].reshape(-1)
-    header_bits = [int(flat[p]) & 1 for p in header_positions]
-    payload_length = parse_header(bits_to_bytes(header_bits))
-    # Fail-fast: blob valid minimal 44 byte (salt+nonce+tag crypto).
-    # Panjang di bawah itu pasti sampah (mis. header rusak akibat JPEG)
-    # — tolak sebelum generate jutaan posisi permutasi yang lambat.
-    if payload_length < CRYPTO_OVERHEAD_BYTES:
-        raise InvalidPayloadError("Password salah atau data telah dimodifikasi.")
-    needed = (HEADER_SIZE + payload_length) * 8
-    if needed > total_slots:
-        raise InvalidPayloadError("Password salah atau data telah dimodifikasi.")
-    positions = generate_positions(total_slots, needed, seed)
-    payload = extract_payload(image, positions)
-    plaintext = decrypt_message(payload, password)
-    return plaintext.decode("utf-8")
+
+    for m in MBITS_CHOICES:
+        channel_mask = (1 << m) - 1
+        header_chunks_needed = -(-header_bits_needed // m)
+        try:
+            header_positions = generate_positions(
+                total_slots, header_chunks_needed, seed
+            )
+            header_bits = []
+            for position in header_positions:
+                header_bits.extend(
+                    (int(flat[position]) & channel_mask) >> shift & 1
+                    for shift in range(m - 1, -1, -1)
+                )
+            payload_length = parse_header(
+                bits_to_bytes(header_bits[:header_bits_needed])
+            )
+        except (InvalidPayloadError, ValueError, IndexError):
+            continue
+        # Fail-fast: blob valid minimal 44 byte (salt+nonce+tag crypto).
+        # Panjang di bawah itu pasti sampah (salah m / header rusak JPEG)
+        # — coba m berikutnya sebelum generate jutaan posisi yang lambat.
+        if payload_length < CRYPTO_OVERHEAD_BYTES:
+            continue
+        needed_bits = (HEADER_SIZE + payload_length) * 8
+        needed_chunks = -(-needed_bits // m)
+        if needed_chunks > total_slots:
+            continue
+        try:
+            positions = generate_positions(total_slots, needed_chunks, seed)
+            payload = extract_payload(image, positions, m)
+            plaintext = decrypt_message(payload, password)
+            return plaintext.decode("utf-8"), m
+        except (InvalidPayloadError, ValueError, UnicodeDecodeError):
+            continue
+
+    raise InvalidPayloadError("Password salah atau data telah dimodifikasi.")
 
 
 @app.route("/")
@@ -147,15 +179,17 @@ def encode_post():
         flash("Silakan masukkan pesan.", "error")
         return redirect(url_for("encode_page"))
 
+    mbits = _parse_mbits(request.form.get("mbits"))
+
     try:
         image = Image.open(cover_file.stream)
         if image.mode not in {"RGB", "RGBA"}:
             image = image.convert("RGB")
 
-        capacity = calculate_capacity(image)  # Opsi A: budget plaintext
+        capacity = calculate_capacity(image, mbits)  # Opsi A: budget plaintext
         plain_bytes = message.encode("utf-8")
         if len(plain_bytes) > capacity:
-            flash(f"Pesan terlalu besar untuk gambar ini. Maks {capacity} byte, pesan {len(plain_bytes)} byte.", "error")
+            flash(f"Pesan terlalu besar untuk gambar ini pada varian {mbits}-bit. Maks {capacity} byte, pesan {len(plain_bytes)} byte.", "error")
             return redirect(url_for("encode_page"))
 
         try:
@@ -166,7 +200,8 @@ def encode_post():
 
         width, height = image.size
         total_slots = width * height * 3
-        needed = (HEADER_SIZE + len(payload)) * 8
+        needed_bits = (HEADER_SIZE + len(payload)) * 8
+        needed = -(-needed_bits // mbits)  # jumlah slot, bukan bit
         # safety net: blob + header harus muat di slot (harusnya sudah terjamin oleh cek plaintext)
         if needed > total_slots:
             flash("Pesan terlalu besar untuk gambar ini (setelah enkripsi).", "error")
@@ -176,7 +211,7 @@ def encode_post():
         # hanya generate sebanyak yang dibutuhkan — hemat untuk gambar besar + pesan kecil
         # prefix-consistent: generate_positions(total, needed, seed)[:64] == generate_positions(total, 64, seed)
         positions = generate_positions(total_slots, needed, seed)
-        stego = embed_payload(image, payload, positions)
+        stego = embed_payload(image, payload, positions, mbits)
 
         cover_id = uuid.uuid4().hex[:8]
         cover_path = UPLOAD_DIR / f"{cover_id}_cover.png"
@@ -195,7 +230,7 @@ def encode_post():
         else:
             psnr_display = f"{psnr_value:.2f} dB"
 
-        flash("Pesan berhasil disisipkan!", "success")
+        flash(f"Pesan berhasil disisipkan! (varian {mbits}-bit)", "success")
         return render_template(
             "encode.html",
             cover_url=cover_url,
@@ -207,6 +242,7 @@ def encode_post():
             cover_w=width,
             cover_h=height,
             cover_budget=capacity,
+            mbits=mbits,
         )
 
     except CapacityError:
@@ -239,27 +275,8 @@ def decode_post():
             image = image.convert("RGB")
 
         width, height = image.size
-        total_slots = width * height * 3
-        seed = draft_derive_prng_seed(password)
-        header_bits_needed = HEADER_SIZE * 8
-        if total_slots < header_bits_needed:
-            flash("Gambar terlalu kecil untuk berisi payload.", "error")
-            return redirect(url_for("encode_page") + "#decode")
-        # hemat: generate hanya 64 dulu untuk header, karena prefix-consistent
-        # generate_positions(total, 64, seed) == generate_positions(total, needed, seed)[:64]
-        header_positions = generate_positions(total_slots, header_bits_needed, seed)
-        normalized = normalize_image(image)
-        flat = np.array(normalized)[:, :, :3].reshape(-1)
-        header_bits = [int(flat[p]) & 1 for p in header_positions]
-        payload_length = parse_header(bits_to_bytes(header_bits))
-        needed = (HEADER_SIZE + payload_length) * 8
-        if needed > total_slots:
-            flash("Password salah atau data telah dimodifikasi.", "error")
-            return redirect(url_for("encode_page") + "#decode")
-        positions = generate_positions(total_slots, needed, seed)
-        payload = extract_payload(image, positions)
-        plaintext = decrypt_message(payload, password)
-        decoded = plaintext.decode("utf-8")
+        # varian m-bit terdeteksi otomatis (coba 1 → 2 → 3)
+        decoded, used_m = _extract_message_from_image(image, password)
 
         stego_id = uuid.uuid4().hex[:8]
         stego_preview_path = UPLOAD_DIR / f"{stego_id}_decode_preview.png"
@@ -270,7 +287,7 @@ def decode_post():
         preview_img.save(stego_preview_path, format="PNG")
         stego_preview_url = url_for("static", filename=f"uploads/{stego_preview_path.name}")
 
-        flash("Pesan berhasil diekstrak!", "success")
+        flash(f"Pesan berhasil diekstrak! (terdeteksi varian {used_m}-bit)", "success")
         return render_template(
             "encode.html",
             decoded_message=decoded,
@@ -451,56 +468,64 @@ def analysis_dataset_post():
             "cover_file": cover_file,
             "lsb_cover_file": lsb_cover_file,
             "payloads": {},
+            "variants": {},
             "jpeg": {"success": False, "error": "belum diuji", "file": ""},
         }
 
-        for label, size in DATASET_PAYLOADS:
-            if size > capacity:
-                entry["payloads"][label] = {"skipped": True, "size": size}
-                continue
-            try:
-                plain = _dataset_plaintext(size)
-                blob = encrypt_message(plain, password)
-                needed = (HEADER_SIZE + len(blob)) * 8
-                positions = generate_positions(total_slots, needed, seed)
-                stego = embed_payload(cover, blob, positions)
-                # roundtrip check — pakai positions yang sama, jangan generate ulang
-                raw = extract_payload(stego, positions)
-                ok = decrypt_message(raw, password) == plain
-
-                stego_file = f"stego_{stem}_{label}.png"
-                stego.save(batch_dir / stego_file, format="PNG")
-                fig = plot_histogram(cover, stego)
+        # Uji semua varian m-bit: m=1 mengisi entry["payloads"] (jalur lama,
+        # dipakai JPEG/histogram/download), m=2,3 mengisi entry["variants"].
+        for m in MBITS_CHOICES:
+            suffix = "" if m == 1 else f"_m{m}"
+            cap_m = calculate_capacity(cover, m)
+            store = entry["payloads"] if m == 1 else entry["variants"].setdefault(
+                str(m), {"capacity": cap_m, "payloads": {}})["payloads"]
+            for label, size in DATASET_PAYLOADS:
+                if size > cap_m:
+                    store[label] = {"skipped": True, "size": size}
+                    continue
                 try:
-                    hist_file = f"hist_{stem}_{label}.png"
-                    (batch_dir / hist_file).write_bytes(figure_to_png_bytes(fig))
-                finally:
-                    try:
-                        from matplotlib import pyplot as plt
-                        plt.close(fig)
-                    except Exception:
-                        pass
-                lsb_stego_file = f"lsb_stego_{stem}_{label}.png"
-                lsb_plane_to_image(extract_lsb_plane(stego)).save(
-                    batch_dir / lsb_stego_file, format="PNG"
-                )
+                    plain = _dataset_plaintext(size)
+                    blob = encrypt_message(plain, password)
+                    needed = -(-(HEADER_SIZE + len(blob)) * 8 // m)
+                    positions = generate_positions(total_slots, needed, seed)
+                    stego = embed_payload(cover, blob, positions, m)
+                    # roundtrip check — pakai positions yang sama, jangan generate ulang
+                    raw = extract_payload(stego, positions, m)
+                    ok = decrypt_message(raw, password) == plain
 
-                mse_v = calculate_mse(cover, stego)
-                psnr_v = calculate_psnr(cover, stego)
-                entry["payloads"][label] = {
-                    "size": size,
-                    "blob_size": len(blob),
-                    "mse": mse_v,
-                    "psnr": None if psnr_v == float("inf") else psnr_v,
-                    "ok": bool(ok),
-                    "hist_file": hist_file,
-                    "stego_file": stego_file,
-                    "lsb_stego_file": lsb_stego_file,
-                }
-            except Exception as e:
-                entry["payloads"][label] = {
-                    "size": size, "error": f"{type(e).__name__}: {e}"
-                }
+                    stego_file = f"stego_{stem}_{label}{suffix}.png"
+                    stego.save(batch_dir / stego_file, format="PNG")
+                    fig = plot_histogram(cover, stego)
+                    try:
+                        hist_file = f"hist_{stem}_{label}{suffix}.png"
+                        (batch_dir / hist_file).write_bytes(figure_to_png_bytes(fig))
+                    finally:
+                        try:
+                            from matplotlib import pyplot as plt
+                            plt.close(fig)
+                        except Exception:
+                            pass
+                    lsb_stego_file = f"lsb_stego_{stem}_{label}{suffix}.png"
+                    lsb_plane_to_image(extract_lsb_plane(stego)).save(
+                        batch_dir / lsb_stego_file, format="PNG"
+                    )
+
+                    mse_v = calculate_mse(cover, stego)
+                    psnr_v = calculate_psnr(cover, stego)
+                    store[label] = {
+                        "size": size,
+                        "blob_size": len(blob),
+                        "mse": mse_v,
+                        "psnr": None if psnr_v == float("inf") else psnr_v,
+                        "ok": bool(ok),
+                        "hist_file": hist_file,
+                        "stego_file": stego_file,
+                        "lsb_stego_file": lsb_stego_file,
+                    }
+                except Exception as e:
+                    store[label] = {
+                        "size": size, "error": f"{type(e).__name__}: {e}"
+                    }
 
         # JPEG attack per citra — pakai stego medium (konsisten dgn benchmark)
         medium = entry["payloads"].get("medium", {})
@@ -514,7 +539,7 @@ def analysis_dataset_post():
                 def extract_fn(jpeg_path, _password=password):
                     with Image.open(jpeg_path) as jpg:
                         jpg.load()
-                        return _extract_message_from_image(jpg, _password)
+                        return _extract_message_from_image(jpg, _password)[0]
 
                 jres = test_jpeg_robustness(
                     tmp_path, extract_fn, DATASET_JPEG_QUALITY
@@ -597,6 +622,30 @@ def analysis_dataset_post():
                         }
                     )
                     for label, p in e["payloads"].items()
+                },
+                "variants": {
+                    m: dict(
+                        [("capacity", v["capacity"])] + [
+                            (label, (
+                                {"skipped": True, "size": p.get("size")}
+                                if p.get("skipped") or "mse" not in p
+                                else {
+                                    "size": p["size"],
+                                    "mse": round(p["mse"], 6),
+                                    "psnr": (
+                                        "inf" if p["psnr"] is None
+                                        else round(p["psnr"], 2)
+                                    ),
+                                    "ok": p["ok"],
+                                    "hist_url": _url(p["hist_file"]),
+                                    "stego_url": _url(p["stego_file"]),
+                                    "lsb_stego_url": _url(p["lsb_stego_file"]),
+                                }
+                            ))
+                            for label, p in v["payloads"].items()
+                        ]
+                    )
+                    for m, v in e.get("variants", {}).items()
                 },
             }
             for e in summary["images"]
@@ -693,6 +742,26 @@ def analysis_dataset_download(batch_id):
                 "jpeg_error": e["jpeg"]["error"],
             })
 
+    # Sheet Varian_mbit lengkap: m=1 disalin dari data existing (tanpa
+    # komputasi ulang), m=2,3 dari hasil varian — urut per citra, per m.
+    variants = []
+    for e in summary["images"]:
+        sources = [("1", {"capacity": e["capacity"], "payloads": e["payloads"]})]
+        sources += sorted(e.get("variants", {}).items())
+        for m, v in sources:
+            for label, size in DATASET_PAYLOADS:
+                p = v["payloads"].get(label, {})
+                if p.get("skipped") or "mse" not in p:
+                    continue
+                variants.append({
+                    "image": e["name"],
+                    "m": int(m),
+                    "message_size": p["size"],
+                    "capacity": v["capacity"],
+                    "mse": p["mse"],
+                    "psnr": float("inf") if p["psnr"] is None else p["psnr"],
+                })
+
     buf = io.BytesIO()
     build_xlsx(
         rows, per_cover, buf,
@@ -701,6 +770,7 @@ def analysis_dataset_download(batch_id):
         password_desc="satu password untuk semua citra (tidak disimpan)",
         jpeg_quality=summary.get("jpeg_quality", DATASET_JPEG_QUALITY),
         roundtrip=roundtrip,
+        variants=variants,
     )
     buf.seek(0)
     return send_file(
